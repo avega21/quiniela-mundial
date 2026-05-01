@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 
 // ─── Supabase Client ─────────────────────────────────────────────────────────
-const SUPABASE_URL = "https://lwkphbyqpndfeouksftq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_secret_KV0oAyf7PDOn7l9BtXpTaQ_BPLgTix7";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 async function supabaseReq(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -470,7 +470,7 @@ export default function QuinielaMundial() {
                       <span className="lbn">{p.name}</span>
                       {p.id===participant.id && <span className="mec">YO</span>}
                     </div>
-                    <div className="lbc">{p.code}</div>
+                    {/* <div className="lbc">{p.code}</div> */}
                     {prizeFor(i) && <div className="lbprize">💰 {prizeFor(i)}</div>}
                   </div>
                   <div><div className="lbpts">{p.total_points}</div><div className="lbptsl">PTS</div></div>
