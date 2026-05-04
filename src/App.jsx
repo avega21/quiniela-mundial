@@ -447,7 +447,7 @@ export default function QuinielaMundial() {
                 <div>
                   <div style={{fontSize:11,color:"var(--dim)",marginBottom:3}}>💰 POZO TOTAL</div>
                   <div style={{fontFamily:"'Bebas Neue'",fontSize:38,color:"var(--gold)",lineHeight:1}}>${prizes.total.toLocaleString()} <span style={{fontSize:18,color:"var(--dim)"}}>MXN</span></div>
-                  <div style={{fontSize:11,color:"var(--dim)",marginTop:3}}>{participants.length} participantes · $300 c/u · Admin cobra ${prizes.adminTake.toLocaleString()}</div>
+                  <div style={{fontSize:11,color:"var(--dim)",marginTop:3}}>{participants.length} participantes · $300 c/u</div>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:11,color:"var(--dim)"}}>PARTIDOS JUGADOS</div>
