@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-// ─── Supabase Client ─────────────────────────────────────────────────────────
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+// ─── Supabase client ──────────────────────────────────────────────────────────
+const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-async function supabaseReq(path, options = {}) {
+async function db(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
       apikey: SUPABASE_ANON_KEY,
@@ -16,19 +16,22 @@ async function supabaseReq(path, options = {}) {
     method: options.method || "GET",
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg);
+  }
   return res.status === 204 ? null : res.json();
 }
 
 // ─── Prize config ─────────────────────────────────────────────────────────────
-const ENTRY_FEE = 300;
-const ADMIN_CUT = 0.10;
-const PRIZE_DIST = [0.50, 0.30, 0.20];
+const ENTRY_FEE    = 300;
+const ADMIN_CUT    = 0.10;
+const PRIZE_DIST   = [0.50, 0.30, 0.20];
 
 function calcPrizes(n) {
-  const total = n * ENTRY_FEE;
+  const total     = n * ENTRY_FEE;
   const adminTake = Math.round(total * ADMIN_CUT);
-  const pool = total - adminTake;
+  const pool      = total - adminTake;
   return {
     total, adminTake, pool,
     first:  Math.round(pool * PRIZE_DIST[0]),
@@ -37,109 +40,14 @@ function calcPrizes(n) {
   };
 }
 
-// ─── Calendario oficial FIFA Mundial 2026 — Fase de Grupos (72 partidos) ─────
-// Fuente: ESPN Deportes / FIFA (post-repechaje, confirmado abril 2026)
-// Playoffs UEFA: A=Bosnia | B=Suecia | C=Turquía | D=Chequia
-// Repechaje intercontinental: IC1=Congo DR | IC2=Irak
-const M = (id,g,h,a,d) => ({id,group:g,home:h,away:a,home_score:null,away_score:null,match_date:d});
-
-const MOCK_MATCHES = [
-  // ── GRUPO A ── México, Sudáfrica, Corea del Sur, Chequia
-  M( 1,"A","México",         "Sudáfrica",       "2026-06-11"),
-  M( 2,"A","Corea del Sur",  "Chequia",         "2026-06-11"),
-  M( 3,"A","Chequia",        "Sudáfrica",       "2026-06-18"),
-  M( 4,"A","México",         "Corea del Sur",   "2026-06-18"),
-  M( 5,"A","Chequia",        "México",          "2026-06-24"),
-  M( 6,"A","Sudáfrica",      "Corea del Sur",   "2026-06-24"),
-  // ── GRUPO B ── Canadá, Bosnia, Qatar, Suiza
-  M( 7,"B","Canadá",         "Bosnia",          "2026-06-12"),
-  M( 8,"B","Qatar",          "Suiza",           "2026-06-13"),
-  M( 9,"B","Suiza",          "Bosnia",          "2026-06-18"),
-  M(10,"B","Canadá",         "Qatar",           "2026-06-18"),
-  M(11,"B","Suiza",          "Canadá",          "2026-06-24"),
-  M(12,"B","Bosnia",         "Qatar",           "2026-06-24"),
-  // ── GRUPO C ── Brasil, Marruecos, Haití, Escocia
-  M(13,"C","Brasil",         "Marruecos",       "2026-06-13"),
-  M(14,"C","Haití",          "Escocia",         "2026-06-13"),
-  M(15,"C","Escocia",        "Marruecos",       "2026-06-19"),
-  M(16,"C","Brasil",         "Haití",           "2026-06-19"),
-  M(17,"C","Escocia",        "Brasil",          "2026-06-24"),
-  M(18,"C","Marruecos",      "Haití",           "2026-06-24"),
-  // ── GRUPO D ── EE.UU., Paraguay, Australia, Turquía
-  M(19,"D","EE.UU.",         "Paraguay",        "2026-06-12"),
-  M(20,"D","Australia",      "Turquía",         "2026-06-13"),
-  M(21,"D","Turquía",        "Paraguay",        "2026-06-19"),
-  M(22,"D","EE.UU.",         "Australia",       "2026-06-19"),
-  M(23,"D","Turquía",        "EE.UU.",          "2026-06-25"),
-  M(24,"D","Paraguay",       "Australia",       "2026-06-25"),
-  // ── GRUPO E ── Alemania, Curazao, Costa de Marfil, Ecuador
-  M(25,"E","Alemania",       "Curazao",         "2026-06-14"),
-  M(26,"E","Costa de Marfil","Ecuador",         "2026-06-14"),
-  M(27,"E","Alemania",       "Costa de Marfil", "2026-06-20"),
-  M(28,"E","Ecuador",        "Curazao",         "2026-06-20"),
-  M(29,"E","Ecuador",        "Alemania",        "2026-06-25"),
-  M(30,"E","Curazao",        "Costa de Marfil", "2026-06-25"),
-  // ── GRUPO F ── Países Bajos, Japón, Suecia, Túnez
-  M(31,"F","Países Bajos",   "Japón",           "2026-06-14"),
-  M(32,"F","Suecia",         "Túnez",           "2026-06-14"),
-  M(33,"F","Países Bajos",   "Suecia",          "2026-06-20"),
-  M(34,"F","Túnez",          "Japón",           "2026-06-20"),
-  M(35,"F","Japón",          "Suecia",          "2026-06-25"),
-  M(36,"F","Túnez",          "Países Bajos",    "2026-06-25"),
-  // ── GRUPO G ── Bélgica, Egipto, Irán, Nueva Zelanda
-  M(37,"G","Bélgica",        "Egipto",          "2026-06-15"),
-  M(38,"G","Irán",           "Nueva Zelanda",   "2026-06-15"),
-  M(39,"G","Bélgica",        "Irán",            "2026-06-21"),
-  M(40,"G","Nueva Zelanda",  "Egipto",          "2026-06-21"),
-  M(41,"G","Egipto",         "Irán",            "2026-06-26"),
-  M(42,"G","Nueva Zelanda",  "Bélgica",         "2026-06-26"),
-  // ── GRUPO H ── España, Cabo Verde, Arabia Saudita, Uruguay
-  M(43,"H","España",         "Cabo Verde",      "2026-06-15"),
-  M(44,"H","Arabia Saudita", "Uruguay",         "2026-06-15"),
-  M(45,"H","España",         "Arabia Saudita",  "2026-06-21"),
-  M(46,"H","Uruguay",        "Cabo Verde",      "2026-06-21"),
-  M(47,"H","Cabo Verde",     "Arabia Saudita",  "2026-06-26"),
-  M(48,"H","Uruguay",        "España",          "2026-06-26"),
-  // ── GRUPO I ── Francia, Senegal, Irak, Noruega
-  M(49,"I","Francia",        "Senegal",         "2026-06-16"),
-  M(50,"I","Irak",           "Noruega",         "2026-06-16"),
-  M(51,"I","Francia",        "Irak",            "2026-06-22"),
-  M(52,"I","Noruega",        "Senegal",         "2026-06-22"),
-  M(53,"I","Noruega",        "Francia",         "2026-06-26"),
-  M(54,"I","Senegal",        "Irak",            "2026-06-26"),
-  // ── GRUPO J ── Argentina, Argelia, Austria, Jordania
-  M(55,"J","Argentina",      "Argelia",         "2026-06-16"),
-  M(56,"J","Austria",        "Jordania",        "2026-06-16"),
-  M(57,"J","Argentina",      "Austria",         "2026-06-22"),
-  M(58,"J","Jordania",       "Argelia",         "2026-06-22"),
-  M(59,"J","Argelia",        "Austria",         "2026-06-27"),
-  M(60,"J","Jordania",       "Argentina",       "2026-06-27"),
-  // ── GRUPO K ── Portugal, Congo DR, Uzbekistán, Colombia
-  M(61,"K","Portugal",       "Congo DR",        "2026-06-17"),
-  M(62,"K","Uzbekistán",     "Colombia",        "2026-06-17"),
-  M(63,"K","Portugal",       "Uzbekistán",      "2026-06-23"),
-  M(64,"K","Colombia",       "Congo DR",        "2026-06-23"),
-  M(65,"K","Colombia",       "Portugal",        "2026-06-27"),
-  M(66,"K","Congo DR",       "Uzbekistán",      "2026-06-27"),
-  // ── GRUPO L ── Inglaterra, Croacia, Ghana, Panamá
-  M(67,"L","Inglaterra",     "Croacia",         "2026-06-17"),
-  M(68,"L","Ghana",          "Panamá",          "2026-06-17"),
-  M(69,"L","Inglaterra",     "Ghana",           "2026-06-23"),
-  M(70,"L","Panamá",         "Croacia",         "2026-06-23"),
-  M(71,"L","Panamá",         "Inglaterra",      "2026-06-27"),
-  M(72,"L","Croacia",        "Ghana",           "2026-06-27"),
-];
-
-const MOCK_PARTICIPANTS = [
-  { id:"p1", name:"Carlos R.",  code:"CARL01", total_points:14 },
-  { id:"p2", name:"Ana M.",     code:"ANAM02", total_points:22 },
-  { id:"p3", name:"Luis P.",    code:"LUISP3", total_points:18 },
-  { id:"p4", name:"Sofía G.",   code:"SOFI04", total_points:10 },
-  { id:"p5", name:"Javier T.",  code:"JAVT05", total_points:26 },
-  { id:"p6", name:"María H.",   code:"MARH06", total_points:8  },
-];
-
-const ADMIN_CODE = "ADMIN2026";
+// ─── Points logic ─────────────────────────────────────────────────────────────
+function calcPoints(predHome, predAway, realHome, realAway) {
+  if (realHome === null || realHome === undefined) return null;
+  if (Number(predHome) === realHome && Number(predAway) === realAway) return 4;
+  const rW = realHome > realAway ? "H" : realAway > realHome ? "A" : "D";
+  const pW = Number(predHome) > Number(predAway) ? "H" : Number(predAway) > Number(predHome) ? "A" : "D";
+  return rW === pW ? 2 : 0;
+}
 
 // ─── Flags ────────────────────────────────────────────────────────────────────
 const FLAGS = {
@@ -157,14 +65,6 @@ const FLAGS = {
   "Inglaterra":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croacia":"🇭🇷","Ghana":"🇬🇭","Panamá":"🇵🇦",
 };
 const flag = t => FLAGS[t] || "🏳️";
-
-function calcPoints(pred, match) {
-  if (match.home_score === null) return null;
-  if (Number(pred.home) === match.home_score && Number(pred.away) === match.away_score) return 4;
-  const rW = match.home_score > match.away_score ? "H" : match.away_score > match.home_score ? "A" : "D";
-  const pW = Number(pred.home) > Number(pred.away) ? "H" : Number(pred.away) > Number(pred.home) ? "A" : "D";
-  return rW === pW ? 2 : 0;
-}
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = `
@@ -205,6 +105,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--pitch);color:var(--white)
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
 .card-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 
+/* Loading */
+.loading{display:flex;align-items:center;justify-content:center;min-height:200px;flex-direction:column;gap:12px;color:var(--dim);}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
 /* Login */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;z-index:1;flex-direction:column;gap:28px;}
 .trophy{font-size:68px;animation:bob 3s ease-in-out infinite;}
@@ -217,10 +122,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--pitch);color:var(--white)
 .inp:focus{border-color:var(--gold);}
 .inp-plain{letter-spacing:normal!important;text-transform:none!important;}
 .btn{padding:12px 22px;border-radius:10px;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
 .btn-gold{background:var(--gold);color:var(--pitch);}
-.btn-gold:hover{background:var(--gold-light);transform:translateY(-1px);}
+.btn-gold:hover:not(:disabled){background:var(--gold-light);transform:translateY(-1px);}
 .btn-green{background:rgba(22,163,74,.2);color:#4ade80;border:1px solid rgba(22,163,74,.3);}
-.btn-green:hover{background:rgba(22,163,74,.3);}
+.btn-green:hover:not(:disabled){background:rgba(22,163,74,.3);}
 .btn-sm{padding:6px 12px;font-size:12px;}
 .err{background:rgba(220,38,38,.15);border:1px solid rgba(220,38,38,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#fca5a5;text-align:center;}
 
@@ -242,7 +148,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--pitch);color:var(--white)
 .lbr:hover{background:rgba(255,255,255,.03);}
 .lbr.me{background:rgba(245,158,11,.07);}
 .rnk{font-family:'Bebas Neue',sans-serif;font-size:21px;width:34px;text-align:center;flex-shrink:0;}
-.rnk.g{color:#f59e0b;} .rnk.s{color:#94a3b8;} .rnk.b{color:#cd7f32;}
+.rnk.g{color:#f59e0b;}.rnk.s{color:#94a3b8;}.rnk.b{color:#cd7f32;}
 .lbn{flex:1;font-weight:500;font-size:14px;}
 .lbc{font-size:11px;color:var(--dim);font-family:monospace;}
 .lbprize{font-size:11px;font-weight:600;color:#4ade80;margin-top:1px;}
@@ -312,278 +218,500 @@ body{font-family:'DM Sans',sans-serif;background:var(--pitch);color:var(--white)
 }
 `;
 
+const ADMIN_CODE = "ADMIN2026";
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function QuinielaMundial() {
-  const [participant, setParticipant] = useState(null);
-  const [isAdmin, setIsAdmin]         = useState(false);
-  const [activeTab, setActiveTab]     = useState("lb");
-  const [loginCode, setLoginCode]     = useState("");
-  const [loginError, setLoginError]   = useState("");
-  const [participants, setParticipants] = useState(MOCK_PARTICIPANTS);
-  const [matches, setMatches]         = useState(MOCK_MATCHES);
-  const [preds, setPreds]             = useState({});
-  const [filter, setFilter]           = useState("ALL");
-  const [unsaved, setUnsaved]         = useState(false);
-  const [toast, setToast]             = useState(null);
-  const [newName, setNewName]         = useState("");
-  const [newCode, setNewCode]         = useState("");
-  const [adminR, setAdminR]           = useState({});
+  const [participant,   setParticipant]   = useState(null);
+  const [isAdmin,       setIsAdmin]       = useState(false);
+  const [activeTab,     setActiveTab]     = useState("lb");
+  const [loginCode,     setLoginCode]     = useState("");
+  const [loginError,    setLoginError]    = useState("");
+  const [loginLoading,  setLoginLoading]  = useState(false);
 
-  useEffect(() => {
-    const s = localStorage.getItem("qm26");
-    if (s) setPreds(JSON.parse(s));
-  }, []);
+  // DB state
+  const [participants,  setParticipants]  = useState([]);
+  const [matches,       setMatches]       = useState([]);
+  const [preds,         setPreds]         = useState({});   // { matchId: {home, away} }
 
-  const toast_ = (msg, emoji = "✅") => { setToast({msg,emoji}); setTimeout(()=>setToast(null),3000); };
+  // UI state
+  const [filter,        setFilter]        = useState("ALL");
+  const [unsaved,       setUnsaved]       = useState(false);
+  const [saving,        setSaving]        = useState(false);
+  const [loading,       setLoading]       = useState(true);
+  const [toast,         setToast]         = useState(null);
 
-  const login = () => {
-    const c = loginCode.trim().toUpperCase();
-    if (c === ADMIN_CODE) { setIsAdmin(true); setParticipant({name:"Admin",code:ADMIN_CODE,id:"admin"}); setActiveTab("admin"); return; }
-    const p = participants.find(x => x.code === c);
-    if (p) { setParticipant(p); setActiveTab("pred"); setLoginError(""); }
-    else setLoginError("Código no encontrado. Verifica e intenta de nuevo.");
+  // Admin form
+  const [newName,       setNewName]       = useState("");
+  const [newCode,       setNewCode]       = useState("");
+  const [addingP,       setAddingP]       = useState(false);
+  const [adminR,        setAdminR]        = useState({});
+
+  // ── Toast helper ────────────────────────────────────────────────────────────
+  const toast_ = (msg, emoji = "✅") => {
+    setToast({ msg, emoji });
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const setPred = (mid, side, val) => {
+  // ── Load participants and matches from Supabase ──────────────────────────────
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [ps, ms] = await Promise.all([
+        db("participants?select=*&order=total_points.desc"),
+        db("matches?select=*&order=id.asc"),
+      ]);
+      setParticipants(ps || []);
+      setMatches(ms || []);
+    } catch (e) {
+      toast_("Error cargando datos: " + e.message, "❌");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ── Load predictions for current participant ─────────────────────────────────
+  const loadPreds = useCallback(async (participantId) => {
+    try {
+      const rows = await db(`predictions?participant_id=eq.${participantId}&select=match_id,predicted_home,predicted_away`);
+      const map = {};
+      (rows || []).forEach(r => {
+        map[r.match_id] = { home: r.predicted_home, away: r.predicted_away };
+      });
+      setPreds(map);
+    } catch (e) {
+      toast_("Error cargando predicciones", "❌");
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ── Login ────────────────────────────────────────────────────────────────────
+  const login = async () => {
+    const code = loginCode.trim().toUpperCase();
+    if (code === ADMIN_CODE) {
+      setIsAdmin(true);
+      setParticipant({ name: "Admin", code: ADMIN_CODE, id: "admin" });
+      setActiveTab("admin");
+      return;
+    }
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      const rows = await db(`participants?code=eq.${code}&select=*`);
+      if (rows && rows.length > 0) {
+        const p = rows[0];
+        setParticipant(p);
+        setActiveTab("pred");
+        await loadPreds(p.id);
+      } else {
+        setLoginError("Código no encontrado. Verifica e intenta de nuevo.");
+      }
+    } catch (e) {
+      setLoginError("Error de conexión. Intenta de nuevo.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  // ── Update local prediction state ────────────────────────────────────────────
+  const setPred = (matchId, side, val) => {
     if (val === "" || (!isNaN(parseInt(val)) && parseInt(val) >= 0 && parseInt(val) <= 99)) {
-      setPreds(p => ({...p, [mid]: {...p[mid], [side]: val === "" ? "" : parseInt(val)}}));
+      setPreds(p => ({ ...p, [matchId]: { ...p[matchId], [side]: val === "" ? "" : parseInt(val) } }));
       setUnsaved(true);
     }
   };
 
-  const save = () => { localStorage.setItem("qm26", JSON.stringify(preds)); setUnsaved(false); toast_("Predicciones guardadas"); };
+  // ── Save predictions to Supabase ─────────────────────────────────────────────
+  const savePreds = async () => {
+    setSaving(true);
+    try {
+      const rows = Object.entries(preds)
+        .filter(([, v]) => v.home !== "" && v.home !== undefined && v.away !== "" && v.away !== undefined)
+        .map(([matchId, v]) => ({
+          participant_id:  participant.id,
+          match_id:        parseInt(matchId),
+          predicted_home:  Number(v.home),
+          predicted_away:  Number(v.away),
+        }));
 
-  const applyResult = (mid) => {
-    const r = adminR[mid];
-    if (!r || r.home === undefined || r.away === undefined) return;
-    setMatches(m => m.map(x => x.id === mid ? {...x, home_score:r.home, away_score:r.away} : x));
-    toast_("Resultado registrado","⚽");
+      await db("predictions", {
+        method: "POST",
+        prefer: "resolution=merge-duplicates,return=minimal",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: rows,
+      });
+
+      setUnsaved(false);
+      toast_("Predicciones guardadas");
+    } catch (e) {
+      toast_("Error guardando: " + e.message, "❌");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const addP = () => {
-    if (!newName || !newCode) return;
-    setParticipants(p => [...p, {id:`p${Date.now()}`,name:newName,code:newCode.toUpperCase(),total_points:0}]);
-    setNewName(""); setNewCode(""); toast_(`${newName} agregado`,"👤");
+  // ── Admin: apply official result ─────────────────────────────────────────────
+  const applyResult = async (matchId) => {
+    const r = adminR[matchId];
+    if (r?.home === undefined || r?.away === undefined) return;
+    try {
+      await db(`matches?id=eq.${matchId}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: { home_score: r.home, away_score: r.away, locked: true },
+      });
+      setMatches(m => m.map(x => x.id === matchId ? { ...x, home_score: r.home, away_score: r.away } : x));
+      toast_("Resultado registrado", "⚽");
+    } catch (e) {
+      toast_("Error: " + e.message, "❌");
+    }
   };
 
-  const prizes   = calcPrizes(participants.length);
-  const sorted   = [...participants].sort((a,b) => b.total_points - a.total_points);
-  const allGroups= [...new Set(MOCK_MATCHES.map(m=>m.group))];
-  const shown    = filter === "ALL" ? matches : matches.filter(m=>m.group===filter);
-  const played   = matches.filter(m=>m.home_score!==null).length;
-  const predCount= Object.values(preds).filter(p=>p.home!==undefined&&p.home!=="").length;
+  // ── Admin: add participant ────────────────────────────────────────────────────
+  const addParticipant = async () => {
+    if (!newName.trim() || !newCode.trim()) return;
+    const code = newCode.trim().toUpperCase();
+
+    // Check duplicate code
+    if (participants.some(p => p.code === code)) {
+      toast_("Ese código ya existe, elige otro", "⚠️");
+      return;
+    }
+
+    setAddingP(true);
+    try {
+      const rows = await db("participants", {
+        method: "POST",
+        body: { name: newName.trim(), code, total_points: 0, paid: false },
+      });
+      if (rows && rows.length > 0) {
+        setParticipants(prev => [...prev, rows[0]].sort((a, b) => b.total_points - a.total_points));
+        setNewName("");
+        setNewCode("");
+        toast_(`${newName.trim()} agregado`, "👤");
+      }
+    } catch (e) {
+      toast_("Error al agregar: " + e.message, "❌");
+    } finally {
+      setAddingP(false);
+    }
+  };
+
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const prizes     = calcPrizes(participants.length);
+  const sorted     = [...participants].sort((a, b) => b.total_points - a.total_points);
+  const allGroups  = [...new Set(matches.map(m => m.group_name))].sort();
+  const shown      = filter === "ALL" ? matches : matches.filter(m => m.group_name === filter);
+  const played     = matches.filter(m => m.home_score !== null).length;
+  const predCount  = Object.values(preds).filter(p => p.home !== "" && p.home !== undefined).length;
 
   const prizeFor = i => {
-    if (i===0) return `$${prizes.first.toLocaleString()} MXN`;
-    if (i===1) return `$${prizes.second.toLocaleString()} MXN`;
-    if (i===2) return `$${prizes.third.toLocaleString()} MXN`;
+    if (i === 0) return `$${prizes.first.toLocaleString()} MXN`;
+    if (i === 1) return `$${prizes.second.toLocaleString()} MXN`;
+    if (i === 2) return `$${prizes.third.toLocaleString()} MXN`;
     return null;
   };
 
-  // ── Login ──────────────────────────────────────────────────────────────────
+  // ── Login screen ─────────────────────────────────────────────────────────────
   if (!participant) return (
     <>
       <style>{styles}</style>
       <div className="app">
-        <div className="grid-bg"/>
+        <div className="grid-bg" />
         <div className="login">
-          <div style={{textAlign:"center"}}>
+          <div style={{ textAlign: "center" }}>
             <div className="trophy">🏆</div>
-            <h1 className="login-title">QUINIELA<br/><span style={{color:"var(--gold)"}}>MUNDIAL</span><br/>2026</h1>
-            <p style={{marginTop:8,color:"var(--dim)",fontSize:14}}>Predice · Compite · Gana</p>
+            <h1 className="login-title">QUINIELA<br /><span style={{ color: "var(--gold)" }}>MUNDIAL</span><br />2026</h1>
+            <p style={{ marginTop: 8, color: "var(--dim)", fontSize: 14 }}>Predice · Compite · Gana</p>
           </div>
           <div className="lbox">
             <div>
               <span className="flabel">Tu código único</span>
               <input className="inp" placeholder="Ej. CARL01" value={loginCode}
-                onChange={e=>{setLoginCode(e.target.value);setLoginError("");}}
-                onKeyDown={e=>e.key==="Enter"&&login()} maxLength={10}/>
+                onChange={e => { setLoginCode(e.target.value); setLoginError(""); }}
+                onKeyDown={e => e.key === "Enter" && login()} maxLength={10} />
             </div>
             {loginError && <div className="err">{loginError}</div>}
-            <button className="btn btn-gold" onClick={login}>⚽ Entrar a la quiniela</button>
-            <p style={{textAlign:"center",fontSize:12,color:"var(--dim)"}}>¿No tienes código? Pide uno al admin.</p>
+            <button className="btn btn-gold" onClick={login} disabled={loginLoading}>
+              {loginLoading ? "Verificando..." : "⚽ Entrar a la quiniela"}
+            </button>
+            <p style={{ textAlign: "center", fontSize: 12, color: "var(--dim)" }}>¿No tienes código? Pide uno al admin.</p>
           </div>
-          <p style={{textAlign:"center",fontSize:12,color:"var(--dim)"}}>
-            Entrada: <strong style={{color:"var(--gold)"}}>$300 MXN</strong>
-            &nbsp;·&nbsp; Pozo actual: <strong style={{color:"var(--gold)"}}>${prizes.total.toLocaleString()} MXN</strong>
-            &nbsp;·&nbsp; {participants.length} participantes
+          <p style={{ textAlign: "center", fontSize: 12, color: "var(--dim)" }}>
+            Entrada: <strong style={{ color: "var(--gold)" }}>$300 MXN</strong>
+            &nbsp;·&nbsp; {participants.length} participantes registrados
           </p>
         </div>
       </div>
     </>
   );
 
-  // ── Main ───────────────────────────────────────────────────────────────────
+  // ── Main app ─────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{styles}</style>
       <div className="app">
-        <div className="grid-bg"/>
+        <div className="grid-bg" />
 
         <header className="hdr">
           <div className="hdr-in">
-            <div className="logo">⚽ <b>QUINIELA</b> <span style={{color:"var(--gold)"}}>MUNDIAL 26</span></div>
-            <div className="ubadge" onClick={()=>{setParticipant(null);setIsAdmin(false);}}>
-              <div className="dot"/>{isAdmin?"🛡️ Admin":participant.name}
+            <div className="logo">⚽ <b>QUINIELA</b> <span style={{ color: "var(--gold)" }}>MUNDIAL 26</span></div>
+            <div className="ubadge" onClick={() => { setParticipant(null); setIsAdmin(false); setPreds({}); }}>
+              <div className="dot" />{isAdmin ? "🛡️ Admin" : participant.name}
             </div>
           </div>
         </header>
 
         <div className="nav">
-          <button className={`tab ${activeTab==="lb"?"on":""}`} onClick={()=>setActiveTab("lb")}>🏅 Tabla</button>
-          {!isAdmin && <button className={`tab ${activeTab==="pred"?"on":""}`} onClick={()=>setActiveTab("pred")}>
-            📋 Predicciones
-            {predCount>0 && <span style={{marginLeft:5,background:"var(--gold)",color:"var(--pitch)",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}}>{predCount}</span>}
-          </button>}
-          {isAdmin && <button className={`tab ${activeTab==="admin"?"on":""}`} onClick={()=>setActiveTab("admin")}>🛡️ Admin</button>}
+          <button className={`tab ${activeTab === "lb" ? "on" : ""}`} onClick={() => setActiveTab("lb")}>🏅 Tabla</button>
+          {!isAdmin && (
+            <button className={`tab ${activeTab === "pred" ? "on" : ""}`} onClick={() => setActiveTab("pred")}>
+              📋 Predicciones
+              {predCount > 0 && <span style={{ marginLeft: 5, background: "var(--gold)", color: "var(--pitch)", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{predCount}</span>}
+            </button>
+          )}
+          {isAdmin && <button className={`tab ${activeTab === "admin" ? "on" : ""}`} onClick={() => setActiveTab("admin")}>🛡️ Admin</button>}
         </div>
 
         <main className="main">
 
           {/* ══ LEADERBOARD ══ */}
-          {activeTab==="lb" && <>
-            <div className="pbox">
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
-                <div>
-                  <div style={{fontSize:11,color:"var(--dim)",marginBottom:3}}>💰 POZO TOTAL</div>
-                  <div style={{fontFamily:"'Bebas Neue'",fontSize:38,color:"var(--gold)",lineHeight:1}}>${prizes.total.toLocaleString()} <span style={{fontSize:18,color:"var(--dim)"}}>MXN</span></div>
-                  <div style={{fontSize:11,color:"var(--dim)",marginTop:3}}>{participants.length} participantes · $300 c/u</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:11,color:"var(--dim)"}}>PARTIDOS JUGADOS</div>
-                  <div style={{fontFamily:"'Bebas Neue'",fontSize:28,lineHeight:1}}>{played}<span style={{fontSize:15,color:"var(--dim)"}}>/{matches.length}</span></div>
-                </div>
-              </div>
-              <div className="pgrid">
-                <div className="pc g"><div className="pc-label">🥇 1° LUGAR</div><div className="pc-amt amt-gold">${prizes.first.toLocaleString()}</div><div className="pc-pct">50% del pozo</div></div>
-                <div className="pc">  <div className="pc-label">🥈 2° LUGAR</div><div className="pc-amt amt-silver">${prizes.second.toLocaleString()}</div><div className="pc-pct">30% del pozo</div></div>
-                <div className="pc">  <div className="pc-label">🥉 3° LUGAR</div><div className="pc-amt amt-bronze">${prizes.third.toLocaleString()}</div><div className="pc-pct">20% del pozo</div></div>
-              </div>
-            </div>
-
-            <div className="card">
-              {sorted.map((p,i) => (
-                <div key={p.id} className={`lbr ${p.id===participant.id?"me":""}`}>
-                  <div className={`rnk ${i===0?"g":i===1?"s":i===2?"b":""}`}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":`#${i+1}`}</div>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:7}}>
-                      <span className="lbn">{p.name}</span>
-                      {p.id===participant.id && <span className="mec">YO</span>}
+          {activeTab === "lb" && (
+            <>
+              <div className="pbox">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--dim)", marginBottom: 3 }}>💰 POZO TOTAL</div>
+                    <div style={{ fontFamily: "'Bebas Neue'", fontSize: 38, color: "var(--gold)", lineHeight: 1 }}>
+                      ${prizes.total.toLocaleString()} <span style={{ fontSize: 18, color: "var(--dim)" }}>MXN</span>
                     </div>
-                    {/* <div className="lbc">{p.code}</div> */}
-                    {prizeFor(i) && <div className="lbprize">💰 {prizeFor(i)}</div>}
+                    <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3 }}>
+                      {participants.length} participantes · $300 c/u · Admin: ${prizes.adminTake.toLocaleString()}
+                    </div>
                   </div>
-                  <div><div className="lbpts">{p.total_points}</div><div className="lbptsl">PTS</div></div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 11, color: "var(--dim)" }}>PARTIDOS JUGADOS</div>
+                    <div style={{ fontFamily: "'Bebas Neue'", fontSize: 28, lineHeight: 1 }}>
+                      {played}<span style={{ fontSize: 15, color: "var(--dim)" }}>/{matches.length}</span>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-            <p style={{marginTop:13,fontSize:12,color:"var(--dim)",textAlign:"center"}}>
-              ⭐ Exacto = 4 pts &nbsp;·&nbsp; ✅ Ganador correcto = 2 pts &nbsp;·&nbsp; ❌ Fallo = 0 pts
-            </p>
-          </>}
+                <div className="pgrid">
+                  <div className="pc g"><div className="pc-label">🥇 1° LUGAR</div><div className="pc-amt amt-gold">${prizes.first.toLocaleString()}</div><div className="pc-pct">50% del pozo</div></div>
+                  <div className="pc">  <div className="pc-label">🥈 2° LUGAR</div><div className="pc-amt amt-silver">${prizes.second.toLocaleString()}</div><div className="pc-pct">30% del pozo</div></div>
+                  <div className="pc">  <div className="pc-label">🥉 3° LUGAR</div><div className="pc-amt amt-bronze">${prizes.third.toLocaleString()}</div><div className="pc-pct">20% del pozo</div></div>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="loading"><div className="spinner" /><span>Cargando tabla...</span></div>
+              ) : (
+                <div className="card">
+                  {sorted.length === 0 && (
+                    <div style={{ padding: 24, textAlign: "center", color: "var(--dim)" }}>Aún no hay participantes registrados.</div>
+                  )}
+                  {sorted.map((p, i) => (
+                    <div key={p.id} className={`lbr ${p.id === participant.id ? "me" : ""}`}>
+                      <div className={`rnk ${i === 0 ? "g" : i === 1 ? "s" : i === 2 ? "b" : ""}`}>
+                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <span className="lbn">{p.name}</span>
+                          {p.id === participant.id && <span className="mec">YO</span>}
+                        </div>
+                        <div className="lbc">{p.code}</div>
+                        {prizeFor(i) && <div className="lbprize">💰 {prizeFor(i)}</div>}
+                      </div>
+                      <div>
+                        <div className="lbpts">{p.total_points}</div>
+                        <div className="lbptsl">PTS</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p style={{ marginTop: 13, fontSize: 12, color: "var(--dim)", textAlign: "center" }}>
+                ⭐ Exacto = 4 pts &nbsp;·&nbsp; ✅ Ganador correcto = 2 pts &nbsp;·&nbsp; ❌ Fallo = 0 pts
+              </p>
+            </>
+          )}
 
           {/* ══ PREDICTIONS ══ */}
-          {activeTab==="pred" && <>
-            <div className="stitle">📋 Mis Predicciones</div>
-            <div className="ssub">{predCount} de {matches.length} partidos predichos · Guarda tus cambios antes de salir</div>
-            <div className="gfilter">
-              <button className={`gbtn ${filter==="ALL"?"on":""}`} onClick={()=>setFilter("ALL")}>Todos</button>
-              {allGroups.map(g=><button key={g} className={`gbtn ${filter===g?"on":""}`} onClick={()=>setFilter(g)}>Grupo {g}</button>)}
-            </div>
-            {shown.map(match => {
-              const p = preds[match.id]||{};
-              const has = p.home!==undefined && p.home!=="" && p.away!==undefined && p.away!=="";
-              const pts = has ? calcPoints(p, match) : null;
-              const lk  = match.home_score !== null;
-              return (
-                <div key={match.id} className={`mc ${lk?"lk":""}`}>
-                  <div className="mmeta">
-                    <span className="gtag">Grupo {match.group}</span>
-                    <span>{new Date(match.match_date+"T12:00:00").toLocaleDateString("es-MX",{weekday:"short",day:"numeric",month:"short"})}</span>
-                    {lk && <span className="bgreen">✓ Finalizado</span>}
-                  </div>
-                  <div className="mteams">
-                    <div className="tm"><span className="tflag">{flag(match.home)}</span><span className="tname">{match.home}</span></div>
-                    <div className="sinputs">
-                      <input className="si" type="number" min="0" max="99" disabled={lk}
-                        value={p.home??""} placeholder="–" onChange={e=>setPred(match.id,"home",e.target.value)}/>
-                      <span className="ssep">–</span>
-                      <input className="si" type="number" min="0" max="99" disabled={lk}
-                        value={p.away??""} placeholder="–" onChange={e=>setPred(match.id,"away",e.target.value)}/>
+          {activeTab === "pred" && (
+            <>
+              <div className="stitle">📋 Mis Predicciones</div>
+              <div className="ssub">{predCount} de {matches.length} partidos predichos · Guarda tus cambios antes de salir</div>
+              <div className="gfilter">
+                <button className={`gbtn ${filter === "ALL" ? "on" : ""}`} onClick={() => setFilter("ALL")}>Todos</button>
+                {allGroups.map(g => (
+                  <button key={g} className={`gbtn ${filter === g ? "on" : ""}`} onClick={() => setFilter(g)}>Grupo {g}</button>
+                ))}
+              </div>
+
+              {loading ? (
+                <div className="loading"><div className="spinner" /><span>Cargando partidos...</span></div>
+              ) : (
+                shown.map(match => {
+                  const p   = preds[match.id] || {};
+                  const has = p.home !== undefined && p.home !== "" && p.away !== undefined && p.away !== "";
+                  const pts = has ? calcPoints(p.home, p.away, match.home_score, match.away_score) : null;
+                  const lk  = match.home_score !== null;
+                  return (
+                    <div key={match.id} className={`mc ${lk ? "lk" : ""}`}>
+                      <div className="mmeta">
+                        <span className="gtag">Grupo {match.group_name}</span>
+                        <span>{new Date(match.match_date + "T12:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })}</span>
+                        {lk && <span className="bgreen">✓ Finalizado</span>}
+                      </div>
+                      <div className="mteams">
+                        <div className="tm"><span className="tflag">{flag(match.home_team)}</span><span className="tname">{match.home_team}</span></div>
+                        <div className="sinputs">
+                          <input className="si" type="number" min="0" max="99" disabled={lk}
+                            value={p.home ?? ""} placeholder="–"
+                            onChange={e => setPred(match.id, "home", e.target.value)} />
+                          <span className="ssep">–</span>
+                          <input className="si" type="number" min="0" max="99" disabled={lk}
+                            value={p.away ?? ""} placeholder="–"
+                            onChange={e => setPred(match.id, "away", e.target.value)} />
+                        </div>
+                        <div className="tm aw"><span className="tflag">{flag(match.away_team)}</span><span className="tname">{match.away_team}</span></div>
+                      </div>
+                      {lk && (
+                        <div className="oscore">
+                          Oficial: <strong style={{ color: "var(--white)" }}>{match.home_score}–{match.away_score}</strong>
+                          &nbsp;·&nbsp; Tu pred: {p.home ?? "?"}–{p.away ?? "?"}
+                        </div>
+                      )}
+                      <div className="pind">
+                        {pts === 4 && <span className="pexact">⭐ +4 pts · Exacto</span>}
+                        {pts === 2 && <span className="pwin">✅ +2 pts · Ganador</span>}
+                        {pts === 0 && <span className="pnone">❌ 0 pts</span>}
+                        {pts === null && has && <span className="ppend">Pendiente de resultado oficial</span>}
+                      </div>
                     </div>
-                    <div className="tm aw"><span className="tflag">{flag(match.away)}</span><span className="tname">{match.away}</span></div>
-                  </div>
-                  {lk && <div className="oscore">Oficial: <strong style={{color:"var(--white)"}}>{match.home_score}–{match.away_score}</strong> · Tu pred: {p.home??"-"}–{p.away??"-"}</div>}
-                  <div className="pind">
-                    {pts===4 && <span className="pexact">⭐ +4 pts · Exacto</span>}
-                    {pts===2 && <span className="pwin">✅ +2 pts · Ganador</span>}
-                    {pts===0 && <span className="pnone">❌ 0 pts</span>}
-                    {pts===null && has && <span className="ppend">Pendiente de resultado oficial</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </>}
+                  );
+                })
+              )}
+            </>
+          )}
 
           {/* ══ ADMIN ══ */}
-          {activeTab==="admin" && isAdmin && <>
-            <div className="stitle">🛡️ Panel Admin</div>
-            <div className="ssub">Gestiona participantes y registra resultados oficiales de los 72 partidos</div>
+          {activeTab === "admin" && isAdmin && (
+            <>
+              <div className="stitle">🛡️ Panel Admin</div>
+              <div className="ssub">Gestiona participantes y registra resultados oficiales</div>
 
-            {/* Prizes */}
-            <div className="pbox" style={{marginBottom:18}}>
-              <div style={{fontSize:13,fontWeight:600,color:"var(--gold)",marginBottom:10}}>💰 Resumen de premios con {participants.length} participantes</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:14,fontSize:13}}>
-                <span>Total: <b>${prizes.total.toLocaleString()}</b></span>
-                <span style={{color:"var(--dim)"}}>→</span>
-                <span>Admin (10%): <b>${prizes.adminTake.toLocaleString()}</b></span>
-                <span>🥇 <b style={{color:"var(--gold)"}}>${prizes.first.toLocaleString()}</b></span>
-                <span>🥈 <b style={{color:"#94a3b8"}}>${prizes.second.toLocaleString()}</b></span>
-                <span>🥉 <b style={{color:"#cd7f32"}}>${prizes.third.toLocaleString()}</b></span>
-              </div>
-            </div>
-
-            {/* Add participant */}
-            <div className="card" style={{marginBottom:18}}>
-              <div className="card-hdr"><strong>👥 Agregar participante</strong><span className="byellow">{participants.length} registrados</span></div>
-              <div style={{padding:18}}>
-                <div className="agrid" style={{marginBottom:12}}>
-                  <div><span className="flabel">Nombre</span><input className="inp inp-plain" placeholder="Ej. Carlos Ramírez" value={newName} onChange={e=>setNewName(e.target.value)}/></div>
-                  <div><span className="flabel">Código único</span><input className="inp" placeholder="Ej. CARL01" value={newCode} onChange={e=>setNewCode(e.target.value)} maxLength={8}/></div>
+              {/* Prizes summary */}
+              <div className="pbox" style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gold)", marginBottom: 10 }}>
+                  💰 Distribución con {participants.length} participantes
                 </div>
-                <button className="btn btn-green btn-sm" onClick={addP}>+ Agregar participante</button>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 13 }}>
+                  <span>Total: <b>${prizes.total.toLocaleString()}</b></span>
+                  <span style={{ color: "var(--dim)" }}>→</span>
+                  <span>Admin: <b>${prizes.adminTake.toLocaleString()}</b></span>
+                  <span>🥇 <b style={{ color: "var(--gold)" }}>${prizes.first.toLocaleString()}</b></span>
+                  <span>🥈 <b style={{ color: "#94a3b8" }}>${prizes.second.toLocaleString()}</b></span>
+                  <span>🥉 <b style={{ color: "#cd7f32" }}>${prizes.third.toLocaleString()}</b></span>
+                </div>
               </div>
-            </div>
 
-            {/* Results */}
-            <div className="card">
-              <div className="card-hdr"><strong>⚽ Ingresar resultados</strong><span className="bgreen">{played}/{matches.length} jugados</span></div>
-              {matches.map(m=>(
-                <div key={m.id} className="ar">
-                  <div className="at" style={{textAlign:"right"}}>{flag(m.home)} {m.home}</div>
-                  <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <input className="si" type="number" min="0" max="99" disabled={m.home_score!==null}
-                      value={m.home_score!==null ? m.home_score : (adminR[m.id]?.home??"")}
-                      onChange={e=>setAdminR(p=>({...p,[m.id]:{...p[m.id],home:parseInt(e.target.value)||0}}))} placeholder="0"/>
-                    <span className="ssep">–</span>
-                    <input className="si" type="number" min="0" max="99" disabled={m.away_score!==null}
-                      value={m.away_score!==null ? m.away_score : (adminR[m.id]?.away??"")}
-                      onChange={e=>setAdminR(p=>({...p,[m.id]:{...p[m.id],away:parseInt(e.target.value)||0}}))} placeholder="0"/>
+              {/* Add participant */}
+              <div className="card" style={{ marginBottom: 18 }}>
+                <div className="card-hdr">
+                  <strong>👥 Agregar participante</strong>
+                  <span className="byellow">{participants.length} registrados</span>
+                </div>
+                <div style={{ padding: 18 }}>
+                  <div className="agrid" style={{ marginBottom: 12 }}>
+                    <div>
+                      <span className="flabel">Nombre completo</span>
+                      <input className="inp inp-plain" placeholder="Ej. Carlos Ramírez"
+                        value={newName} onChange={e => setNewName(e.target.value)} />
+                    </div>
+                    <div>
+                      <span className="flabel">Código único</span>
+                      <input className="inp" placeholder="Ej. CARL01"
+                        value={newCode} onChange={e => setNewCode(e.target.value)} maxLength={8} />
+                    </div>
                   </div>
-                  <div className="at">{m.away} {flag(m.away)}</div>
-                  <div>{m.home_score!==null ? <span className="bgreen">✓</span> : <button className="btn btn-green btn-sm" onClick={()=>applyResult(m.id)}>✓</button>}</div>
+                  <button className="btn btn-green btn-sm" onClick={addParticipant} disabled={addingP}>
+                    {addingP ? "Guardando..." : "+ Agregar participante"}
+                  </button>
                 </div>
-              ))}
-            </div>
-          </>}
+              </div>
+
+              {/* Participants list */}
+              <div className="card" style={{ marginBottom: 18 }}>
+                <div className="card-hdr"><strong>📋 Lista de participantes</strong></div>
+                {loading ? (
+                  <div className="loading"><div className="spinner" /></div>
+                ) : participants.length === 0 ? (
+                  <div style={{ padding: 20, textAlign: "center", color: "var(--dim)" }}>No hay participantes aún.</div>
+                ) : (
+                  sorted.map((p, i) => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: "1px solid var(--border)" }}>
+                      <span style={{ fontFamily: "'Bebas Neue'", fontSize: 18, width: 30, color: i < 3 ? ["#f59e0b","#94a3b8","#cd7f32"][i] : "var(--dim)" }}>#{i + 1}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 500, fontSize: 14 }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: "var(--dim)", fontFamily: "monospace" }}>{p.code}</div>
+                      </div>
+                      <div style={{ fontFamily: "'Bebas Neue'", fontSize: 20, color: "var(--gold)" }}>{p.total_points} <span style={{ fontSize: 11, color: "var(--dim)" }}>pts</span></div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Match results */}
+              <div className="card">
+                <div className="card-hdr">
+                  <strong>⚽ Resultados oficiales</strong>
+                  <span className="bgreen">{played}/{matches.length} jugados</span>
+                </div>
+                {loading ? (
+                  <div className="loading"><div className="spinner" /></div>
+                ) : (
+                  matches.map(m => (
+                    <div key={m.id} className="ar">
+                      <div className="at" style={{ textAlign: "right" }}>{flag(m.home_team)} {m.home_team}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <input className="si" type="number" min="0" max="99" disabled={m.home_score !== null}
+                          value={m.home_score !== null ? m.home_score : (adminR[m.id]?.home ?? "")}
+                          onChange={e => setAdminR(r => ({ ...r, [m.id]: { ...r[m.id], home: parseInt(e.target.value) || 0 } }))}
+                          placeholder="0" />
+                        <span className="ssep">–</span>
+                        <input className="si" type="number" min="0" max="99" disabled={m.away_score !== null}
+                          value={m.away_score !== null ? m.away_score : (adminR[m.id]?.away ?? "")}
+                          onChange={e => setAdminR(r => ({ ...r, [m.id]: { ...r[m.id], away: parseInt(e.target.value) || 0 } }))}
+                          placeholder="0" />
+                      </div>
+                      <div className="at">{m.away_team} {flag(m.away_team)}</div>
+                      <div>
+                        {m.home_score !== null
+                          ? <span className="bgreen">✓</span>
+                          : <button className="btn btn-green btn-sm" onClick={() => applyResult(m.id)}>✓</button>
+                        }
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </main>
 
-        {unsaved && activeTab==="pred" && (
+        {/* Save bar */}
+        {unsaved && activeTab === "pred" && (
           <div className="sbar">
             <span className="sbar-t"><b>Cambios sin guardar</b> · No olvides confirmar</span>
-            <button className="btn btn-gold" style={{padding:"10px 18px"}} onClick={save}>💾 Guardar predicciones</button>
+            <button className="btn btn-gold" style={{ padding: "10px 18px" }} onClick={savePreds} disabled={saving}>
+              {saving ? "Guardando..." : "💾 Guardar predicciones"}
+            </button>
           </div>
         )}
+
         {toast && <div className="toast"><span>{toast.emoji}</span>{toast.msg}</div>}
       </div>
     </>
