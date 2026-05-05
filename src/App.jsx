@@ -487,7 +487,7 @@ export default function QuinielaMundial() {
                       ${prizes.total.toLocaleString()} <span style={{ fontSize: 18, color: "var(--dim)" }}>MXN</span>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3 }}>
-                      {participants.length} participantes · $300 c/u · Admin: ${prizes.adminTake.toLocaleString()}
+                      {participants.length} participantes · $300 c/u
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
