@@ -521,7 +521,7 @@ export default function QuinielaMundial() {
                           <span className="lbn">{p.name}</span>
                           {p.id === participant.id && <span className="mec">YO</span>}
                         </div>
-                        <div className="lbc">{p.code}</div>
+                        {/* <div className="lbc">{p.code}</div> */}
                         {prizeFor(i) && <div className="lbprize">💰 {prizeFor(i)}</div>}
                       </div>
                       <div>
