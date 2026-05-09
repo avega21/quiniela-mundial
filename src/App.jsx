@@ -5,17 +5,22 @@ const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 async function db(path, options = {}) {
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+
+  if (options.prefer) {
+    headers["Prefer"] = options.prefer;
+  }
+
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: options.prefer || "return=representation",
-      ...options.headers,
-    },
+    headers,
     method: options.method || "GET",
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
+
   if (!res.ok) {
     const msg = await res.text();
     throw new Error(msg);
