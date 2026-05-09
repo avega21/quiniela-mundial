@@ -354,7 +354,11 @@ export default function QuinielaMundial() {
         }).then(async res => {
           if (!res.ok) {
             const msg = await res.text();
-            throw new Error(msg);
+            const parsed = JSON.parse(msg);
+            // 23505 = duplicate key, significa que ya estaba guardado — ignorar
+            if (parsed.code !== "23505") {
+              throw new Error(msg);
+            }
           }
         })
       ));
