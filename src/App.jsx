@@ -252,6 +252,9 @@ export default function QuinielaMundial() {
   const [addingP,       setAddingP]       = useState(false);
   const [adminR,        setAdminR]        = useState({});
   const [predsLocked, setPredsLocked] = useState(false);
+  const [allPreds, setAllPreds]           = useState([]);
+  const [overviewPlayer, setOverviewPlayer] = useState(null);
+  const [loadingPreds, setLoadingPreds]   = useState(false);
 
   // ── Toast helper ────────────────────────────────────────────────────────────
   const toast_ = (msg, emoji = "✅") => {
@@ -301,6 +304,23 @@ export default function QuinielaMundial() {
       );
     } catch (e) {
       toast_("Error: " + e.message, "❌");
+    }
+  };
+
+  // ── Show all participants predictions to the admin ──────────────────────────────
+  const loadAllPreds = async (participantId) => {
+    setLoadingPreds(true);
+    try {
+      const rows = await db(
+        `predictions?participant_id=eq.${participantId}&select=match_id,predicted_home,predicted_away`
+      );
+      const map = {};
+      (rows || []).forEach(r => { map[r.match_id] = { home: r.predicted_home, away: r.predicted_away }; });
+      setAllPreds(map);
+    } catch (e) {
+      toast_("Error cargando predicciones: " + e.message, "❌");
+    } finally {
+      setLoadingPreds(false);
     }
   };
 
@@ -523,6 +543,7 @@ export default function QuinielaMundial() {
             </button>
           )}
           {isAdmin && <button className={`tab ${activeTab === "admin" ? "on" : ""}`} onClick={() => setActiveTab("admin")}>🛡️ Admin</button>}
+          {isAdmin && <button className={`tab ${activeTab === "overview" ? "on" : ""}`} onClick={() => setActiveTab("overview")}>👁️ Predicciones</button>}
         </div>
 
         <main className="main">
@@ -788,6 +809,192 @@ export default function QuinielaMundial() {
                   ))
                 )}
               </div>
+            </>
+          )}
+          {/* ══ OVERVIEW DE PREDICCIONES (ADMIN) ══ */}
+          {activeTab === "overview" && isAdmin && (
+            <>
+              <div className="stitle">👁️ Predicciones por jugador</div>
+              <div className="ssub">Selecciona un participante para ver todas sus predicciones</div>
+
+              {/* Selector de jugador */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+                {sorted.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setOverviewPlayer(p); loadAllPreds(p.id); setFilter("ALL"); }}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 999,
+                      border: `1px solid ${overviewPlayer?.id === p.id ? "var(--gold)" : "var(--border)"}`,
+                      background: overviewPlayer?.id === p.id ? "rgba(245,158,11,0.15)" : "transparent",
+                      color: overviewPlayer?.id === p.id ? "var(--gold)" : "var(--dim)",
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      transition: "all .15s",
+                    }}
+                  >
+                    {p.name}
+                    <span style={{
+                      marginLeft: 8,
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 15,
+                      color: overviewPlayer?.id === p.id ? "var(--gold)" : "var(--dim)",
+                    }}>
+                      {p.total_points}pts
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Placeholder cuando no hay jugador seleccionado */}
+              {!overviewPlayer && (
+                <div style={{
+                  textAlign: "center", padding: "48px 24px",
+                  color: "var(--dim)", fontSize: 14,
+                  background: "var(--card)", borderRadius: 16,
+                  border: "1px solid var(--border)",
+                }}>
+                  👆 Selecciona un participante para ver sus predicciones
+                </div>
+              )}
+
+              {/* Predicciones del jugador seleccionado */}
+              {overviewPlayer && (
+                <>
+                  {/* Header del jugador */}
+                  <div style={{
+                    background: "rgba(245,158,11,0.08)",
+                    border: "1px solid rgba(245,158,11,0.25)",
+                    borderRadius: 14, padding: "14px 20px",
+                    marginBottom: 16,
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    flexWrap: "wrap", gap: 10,
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 16 }}>{overviewPlayer.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--dim)", fontFamily: "monospace" }}>{overviewPlayer.code}</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Bebas Neue'", fontSize: 28, color: "var(--gold)", lineHeight: 1 }}>
+                          {overviewPlayer.total_points}
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--dim)" }}>PUNTOS</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Bebas Neue'", fontSize: 28, color: "var(--white)", lineHeight: 1 }}>
+                          {Object.keys(allPreds).length}
+                          <span style={{ fontSize: 14, color: "var(--dim)" }}>/{matches.length}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--dim)" }}>PREDICHOS</div>
+                      </div>
+                      {/* Conteo de puntos ganados */}
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Bebas Neue'", fontSize: 28, color: "#4ade80", lineHeight: 1 }}>
+                          {matches.filter(m => m.home_score !== null && allPreds[m.id]).reduce((acc, m) => {
+                            const pts = calcPoints(allPreds[m.id]?.home, allPreds[m.id]?.away, m.home_score, m.away_score);
+                            return acc + (pts === 4 ? 1 : 0);
+                          }, 0)}
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--dim)" }}>EXACTOS ⭐</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Bebas Neue'", fontSize: 28, color: "#4ade80", lineHeight: 1 }}>
+                          {matches.filter(m => m.home_score !== null && allPreds[m.id]).reduce((acc, m) => {
+                            const pts = calcPoints(allPreds[m.id]?.home, allPreds[m.id]?.away, m.home_score, m.away_score);
+                            return acc + (pts === 2 ? 1 : 0);
+                          }, 0)}
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--dim)" }}>GANADOR ✅</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filtro de grupos */}
+                  <div className="gfilter">
+                    <button className={`gbtn ${filter === "ALL" ? "on" : ""}`} onClick={() => setFilter("ALL")}>Todos</button>
+                    {allGroups.map(g => (
+                      <button key={g} className={`gbtn ${filter === g ? "on" : ""}`} onClick={() => setFilter(g)}>Grupo {g}</button>
+                    ))}
+                  </div>
+
+                  {/* Lista de partidos con predicciones */}
+                  {loadingPreds ? (
+                    <div className="loading"><div className="spinner" /></div>
+                  ) : (
+                    (filter === "ALL" ? matches : matches.filter(m => m.group_name === filter)).map(match => {
+                      const pred = allPreds[match.id];
+                      const played = match.home_score !== null;
+                      const pts = pred && played
+                        ? calcPoints(pred.home, pred.away, match.home_score, match.away_score)
+                        : null;
+
+                      return (
+                        <div key={match.id} className="mc" style={{ opacity: !pred ? 0.45 : 1 }}>
+                          <div className="mmeta">
+                            <span className="gtag">Grupo {match.group_name}</span>
+                            <span>{new Date(match.match_date + "T12:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })}</span>
+                            {played && <span className="bgreen">✓ Finalizado</span>}
+                            {!pred && <span style={{ fontSize: 11, color: "var(--dim)", fontStyle: "italic" }}>Sin predicción</span>}
+                          </div>
+
+                          <div className="mteams">
+                            <div className="tm">
+                              <span className="tflag">{flag(match.home_team)}</span>
+                              <span className="tname">{match.home_team}</span>
+                            </div>
+
+                            {/* Predicción del jugador */}
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <div style={{
+                                  width: 42, height: 42, borderRadius: 9,
+                                  border: `1px solid ${pts === 4 ? "rgba(245,158,11,0.6)" : pts === 2 ? "rgba(22,163,74,0.5)" : pts === 0 ? "rgba(220,38,38,0.4)" : "var(--border)"}`,
+                                  background: pts === 4 ? "rgba(245,158,11,0.15)" : pts === 2 ? "rgba(22,163,74,0.12)" : pts === 0 ? "rgba(220,38,38,0.1)" : "rgba(255,255,255,0.06)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontFamily: "'Bebas Neue'", fontSize: 21, color: "var(--white)",
+                                }}>
+                                  {pred ? pred.home : "–"}
+                                </div>
+                                <span className="ssep">–</span>
+                                <div style={{
+                                  width: 42, height: 42, borderRadius: 9,
+                                  border: `1px solid ${pts === 4 ? "rgba(245,158,11,0.6)" : pts === 2 ? "rgba(22,163,74,0.5)" : pts === 0 ? "rgba(220,38,38,0.4)" : "var(--border)"}`,
+                                  background: pts === 4 ? "rgba(245,158,11,0.15)" : pts === 2 ? "rgba(22,163,74,0.12)" : pts === 0 ? "rgba(220,38,38,0.1)" : "rgba(255,255,255,0.06)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontFamily: "'Bebas Neue'", fontSize: 21, color: "var(--white)",
+                                }}>
+                                  {pred ? pred.away : "–"}
+                                </div>
+                              </div>
+                              {played && pred && (
+                                <div style={{ fontSize: 10, color: "var(--dim)" }}>
+                                  Oficial: <strong style={{ color: "var(--white)" }}>{match.home_score}–{match.away_score}</strong>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="tm aw">
+                              <span className="tflag">{flag(match.away_team)}</span>
+                              <span className="tname">{match.away_team}</span>
+                            </div>
+                          </div>
+
+                          <div className="pind">
+                            {pts === 4 && <span className="pexact">⭐ +4 pts · Exacto</span>}
+                            {pts === 2 && <span className="pwin">✅ +2 pts · Ganador</span>}
+                            {pts === 0 && <span className="pnone">❌ 0 pts</span>}
+                            {pts === null && pred && <span className="ppend">Pendiente de resultado</span>}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </>
+              )}
             </>
           )}
         </main>
