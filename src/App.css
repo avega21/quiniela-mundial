@@ -182,3 +182,6 @@
     border-right-color: var(--border);
   }
 }
+
+.btn-danger{background:rgba(220,38,38,0.2);color:#f87171;border:1px solid rgba(220,38,38,0.3);}
+.btn-danger:hover:not(:disabled){background:rgba(220,38,38,0.3);}

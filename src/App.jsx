@@ -251,6 +251,7 @@ export default function QuinielaMundial() {
   const [newCode,       setNewCode]       = useState("");
   const [addingP,       setAddingP]       = useState(false);
   const [adminR,        setAdminR]        = useState({});
+  const [predsLocked, setPredsLocked] = useState(false);
 
   // ── Toast helper ────────────────────────────────────────────────────────────
   const toast_ = (msg, emoji = "✅") => {
@@ -262,18 +263,46 @@ export default function QuinielaMundial() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [ps, ms] = await Promise.all([
+      const [ps, ms, cfg] = await Promise.all([
         db("participants?select=*&order=total_points.desc"),
         db("matches?select=*&order=id.asc"),
+        db("config?key=eq.predictions_locked&select=value"),
       ]);
       setParticipants(ps || []);
       setMatches(ms || []);
+      if (cfg && cfg.length > 0) {
+        setPredsLocked(cfg[0].value === "true");
+      }
     } catch (e) {
       toast_("Error cargando datos: " + e.message, "❌");
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // ── Lock participants from editing their predictions ──────────────────────────────
+  const toggleLock = async () => {
+    const newValue = !predsLocked;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/config?key=eq.predictions_locked`, {
+        method: "PATCH",
+        headers: {
+          apikey:         SUPABASE_ANON_KEY,
+          Authorization:  `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer":       "return=minimal",
+        },
+        body: JSON.stringify({ value: String(newValue) }),
+      });
+      setPredsLocked(newValue);
+      toast_(
+        newValue ? "Predicciones bloqueadas 🔒" : "Predicciones desbloqueadas 🔓",
+        newValue ? "🔒" : "🔓"
+      );
+    } catch (e) {
+      toast_("Error: " + e.message, "❌");
+    }
+  };
 
   // ── Load predictions for current participant ─────────────────────────────────
   const loadPreds = useCallback(async (participantId) => {
@@ -565,6 +594,22 @@ export default function QuinielaMundial() {
             <>
               <div className="stitle">📋 Mis Predicciones</div>
               <div className="ssub">{predCount} de {matches.length} partidos predichos · Guarda tus cambios antes de salir</div>
+              {predsLocked && (
+                <div style={{
+                  background: "rgba(220,38,38,0.12)",
+                  border: "1px solid rgba(220,38,38,0.3)",
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  marginBottom: 16,
+                  fontSize: 13,
+                  color: "#fca5a5",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}>
+                  🔒 Las predicciones están bloqueadas. Ya no es posible realizar cambios.
+                </div>
+              )}
               <div className="gfilter">
                 <button className={`gbtn ${filter === "ALL" ? "on" : ""}`} onClick={() => setFilter("ALL")}>Todos</button>
                 {allGroups.map(g => (
@@ -590,11 +635,11 @@ export default function QuinielaMundial() {
                       <div className="mteams">
                         <div className="tm"><span className="tflag">{flag(match.home_team)}</span><span className="tname">{match.home_team}</span></div>
                         <div className="sinputs">
-                          <input className="si" type="number" min="0" max="99" disabled={lk}
+                          <input className="si" type="number" min="0" max="99" disabled={lk || predsLocked}
                             value={p.home ?? ""} placeholder="–"
                             onChange={e => setPred(match.id, "home", e.target.value)} />
                           <span className="ssep">–</span>
-                          <input className="si" type="number" min="0" max="99" disabled={lk}
+                          <input className="si" type="number" min="0" max="99" disabled={lk || predsLocked}
                             value={p.away ?? ""} placeholder="–"
                             onChange={e => setPred(match.id, "away", e.target.value)} />
                         </div>
@@ -637,6 +682,29 @@ export default function QuinielaMundial() {
                   <span>🥇 <b style={{ color: "var(--gold)" }}>${prizes.first.toLocaleString()}</b></span>
                   <span>🥈 <b style={{ color: "#94a3b8" }}>${prizes.second.toLocaleString()}</b></span>
                   <span>🥉 <b style={{ color: "#cd7f32" }}>${prizes.third.toLocaleString()}</b></span>
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 18 }}>
+                <div className="card-hdr">
+                  <strong>🔒 Control de predicciones</strong>
+                  <span className={predsLocked ? "byellow" : "bgreen"}>
+                    {predsLocked ? "🔒 Bloqueadas" : "🔓 Abiertas"}
+                  </span>
+                </div>
+                <div style={{ padding: 18 }}>
+                  <p style={{ fontSize: 13, color: "var(--dim)", marginBottom: 14 }}>
+                    {predsLocked
+                      ? "Los participantes no pueden modificar sus predicciones."
+                      : "Los participantes pueden ingresar y modificar sus predicciones."}
+                  </p>
+                  <button
+                    className={`btn ${predsLocked ? "btn-green" : "btn-danger"}`}
+                    style={{ padding: "10px 20px" }}
+                    onClick={toggleLock}
+                  >
+                    {predsLocked ? "🔓 Desbloquear predicciones" : "🔒 Bloquear predicciones"}
+                  </button>
                 </div>
               </div>
 
@@ -725,7 +793,7 @@ export default function QuinielaMundial() {
         </main>
 
         {/* Save bar */}
-        {unsaved && activeTab === "pred" && (
+        {unsaved && activeTab === "pred" && !predsLocked && (
           <div className="sbar">
             <span className="sbar-t"><b>Cambios sin guardar</b> · No olvides confirmar</span>
             <button className="btn btn-gold" style={{ padding: "10px 18px" }} onClick={savePreds} disabled={saving}>
