@@ -338,7 +338,7 @@ export default function QuinielaMundial() {
       await db("predictions", {
         method: "POST",
         prefer: "resolution=merge-duplicates,return=minimal",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        // headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
         body: rows,
       });
 
