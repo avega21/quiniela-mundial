@@ -340,28 +340,46 @@ export default function QuinielaMundial() {
           predicted_away: Number(v.away),
         }));
   
-      // Guardar cada predicción individualmente con upsert correcto
-      await Promise.all(rows.map(row =>
-        fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
-          method: "POST",
-          headers: {
-            apikey:          SUPABASE_ANON_KEY,
-            Authorization:   `Bearer ${SUPABASE_ANON_KEY}`,
-            "Content-Type":  "application/json",
-            "Prefer":        "resolution=merge-duplicates,return=minimal",
-          },
-          body: JSON.stringify(row),
-        }).then(async res => {
-          if (!res.ok) {
-            const msg = await res.text();
-            const parsed = JSON.parse(msg);
-            // 23505 = duplicate key, significa que ya estaba guardado — ignorar
-            if (parsed.code !== "23505") {
-              throw new Error(msg);
-            }
+      await Promise.all(rows.map(async row => {
+        // Primero verificar si ya existe una predicción para este partido
+        const existing = await fetch(
+          `${SUPABASE_URL}/rest/v1/predictions?participant_id=eq.${row.participant_id}&match_id=eq.${row.match_id}&select=id`,
+          {
+            headers: {
+              apikey:        SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
           }
-        })
-      ));
+        ).then(r => r.json());
+  
+        const alreadyExists = existing && existing.length > 0;
+  
+        // Si existe → PATCH (actualizar), si no → POST (insertar)
+        const method  = alreadyExists ? "PATCH" : "POST";
+        const url     = alreadyExists
+          ? `${SUPABASE_URL}/rest/v1/predictions?participant_id=eq.${row.participant_id}&match_id=eq.${row.match_id}`
+          : `${SUPABASE_URL}/rest/v1/predictions`;
+  
+        const res = await fetch(url, {
+          method,
+          headers: {
+            apikey:         SUPABASE_ANON_KEY,
+            Authorization:  `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer":       "return=minimal",
+          },
+          body: JSON.stringify(
+            alreadyExists
+              ? { predicted_home: row.predicted_home, predicted_away: row.predicted_away }
+              : row
+          ),
+        });
+  
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg);
+        }
+      }));
   
       setUnsaved(false);
       toast_("Predicciones guardadas");
