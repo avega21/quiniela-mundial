@@ -334,42 +334,37 @@ export default function QuinielaMundial() {
       const rows = Object.entries(preds)
         .filter(([, v]) => v.home !== "" && v.home !== undefined && v.away !== "" && v.away !== undefined)
         .map(([matchId, v]) => ({
-          participant_id:  participant.id,
-          match_id:        parseInt(matchId),
-          predicted_home:  Number(v.home),
-          predicted_away:  Number(v.away),
+          participant_id: participant.id,
+          match_id:       parseInt(matchId),
+          predicted_home: Number(v.home),
+          predicted_away: Number(v.away),
         }));
-
-      await db("predictions", {
-        method: "POST",
-        prefer: "resolution=merge-duplicates,return=minimal",
-        // headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: rows,
-      });
-
+  
+      // Guardar cada predicción individualmente con upsert correcto
+      await Promise.all(rows.map(row =>
+        fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
+          method: "POST",
+          headers: {
+            apikey:          SUPABASE_ANON_KEY,
+            Authorization:   `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type":  "application/json",
+            "Prefer":        "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify(row),
+        }).then(async res => {
+          if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(msg);
+          }
+        })
+      ));
+  
       setUnsaved(false);
       toast_("Predicciones guardadas");
     } catch (e) {
       toast_("Error guardando: " + e.message, "❌");
     } finally {
       setSaving(false);
-    }
-  };
-
-  // ── Admin: apply official result ─────────────────────────────────────────────
-  const applyResult = async (matchId) => {
-    const r = adminR[matchId];
-    if (r?.home === undefined || r?.away === undefined) return;
-    try {
-      await db(`matches?id=eq.${matchId}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: { home_score: r.home, away_score: r.away, locked: true },
-      });
-      setMatches(m => m.map(x => x.id === matchId ? { ...x, home_score: r.home, away_score: r.away } : x));
-      toast_("Resultado registrado", "⚽");
-    } catch (e) {
-      toast_("Error: " + e.message, "❌");
     }
   };
 
