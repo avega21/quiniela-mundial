@@ -443,25 +443,37 @@ export default function QuinielaMundial() {
   const addParticipant = async () => {
     if (!newName.trim() || !newCode.trim()) return;
     const code = newCode.trim().toUpperCase();
-
-    // Check duplicate code
+  
     if (participants.some(p => p.code === code)) {
       toast_("Ese código ya existe, elige otro", "⚠️");
       return;
     }
-
+  
     setAddingP(true);
     try {
-      const rows = await db("participants", {
+      // Insertar el nuevo participante
+      await fetch(`${SUPABASE_URL}/rest/v1/participants`, {
         method: "POST",
-        body: { name: newName.trim(), code, total_points: 0, paid: false },
+        headers: {
+          apikey:         SUPABASE_ANON_KEY,
+          Authorization:  `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer":       "return=minimal",
+        },
+        body: JSON.stringify({ name: newName.trim(), code, total_points: 0, paid: false }),
       });
+  
+      // Leer el participante recién creado por su código
+      const rows = await db(`participants?code=eq.${code}&select=*`);
       if (rows && rows.length > 0) {
-        setParticipants(prev => [...prev, rows[0]].sort((a, b) => b.total_points - a.total_points));
-        setNewName("");
-        setNewCode("");
-        toast_(`${newName.trim()} agregado`, "👤");
+        setParticipants(prev =>
+          [...prev, rows[0]].sort((a, b) => b.total_points - a.total_points)
+        );
       }
+  
+      setNewName("");
+      setNewCode("");
+      toast_(`${newName.trim()} agregado`, "👤");
     } catch (e) {
       toast_("Error al agregar: " + e.message, "❌");
     } finally {
