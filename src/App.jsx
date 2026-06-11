@@ -439,6 +439,75 @@ export default function QuinielaMundial() {
     }
   };
 
+  const applyResult = async (matchId) => {
+    const r = adminR[matchId];
+    if (r?.home === undefined || r?.away === undefined || r?.home === "" || r?.away === "") {
+      toast_("Ingresa ambos marcadores antes de guardar", "⚠️");
+      return;
+    }
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${matchId}`, {
+        method: "PATCH",
+        headers: {
+          apikey:         SUPABASE_ANON_KEY,
+          Authorization:  `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer":       "return=minimal",
+        },
+        body: JSON.stringify({
+          home_score: Number(r.home),
+          away_score: Number(r.away),
+          locked: true,
+        }),
+      });
+  
+      // Actualizar puntos de todos los participantes para este partido
+      const allPredRows = await db(
+        `predictions?match_id=eq.${matchId}&select=id,participant_id,predicted_home,predicted_away`
+      );
+  
+      await Promise.all((allPredRows || []).map(async pred => {
+        const pts = calcPoints(pred.predicted_home, pred.predicted_away, Number(r.home), Number(r.away));
+        await fetch(`${SUPABASE_URL}/rest/v1/predictions?id=eq.${pred.id}`, {
+          method: "PATCH",
+          headers: {
+            apikey:         SUPABASE_ANON_KEY,
+            Authorization:  `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer":       "return=minimal",
+          },
+          body: JSON.stringify({ points_earned: pts }),
+        });
+      }));
+  
+      // Recalcular total de puntos de cada participante afectado
+      const affectedIds = [...new Set((allPredRows || []).map(p => p.participant_id))];
+      await Promise.all(affectedIds.map(async pid => {
+        const totals = await db(`predictions?participant_id=eq.${pid}&select=points_earned`);
+        const total  = (totals || []).reduce((acc, r) => acc + (r.points_earned || 0), 0);
+        await fetch(`${SUPABASE_URL}/rest/v1/participants?id=eq.${pid}`, {
+          method: "PATCH",
+          headers: {
+            apikey:         SUPABASE_ANON_KEY,
+            Authorization:  `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer":       "return=minimal",
+          },
+          body: JSON.stringify({ total_points: total }),
+        });
+      }));
+  
+      // Refrescar estado local
+      setMatches(ms => ms.map(x =>
+        x.id === matchId ? { ...x, home_score: Number(r.home), away_score: Number(r.away) } : x
+      ));
+      await loadData();
+      toast_("Resultado guardado y puntos actualizados", "⚽");
+    } catch (e) {
+      toast_("Error: " + e.message, "❌");
+    }
+  };
+
   // ── Admin: add participant ────────────────────────────────────────────────────
   const addParticipant = async () => {
     if (!newName.trim() || !newCode.trim()) return;
@@ -796,29 +865,76 @@ export default function QuinielaMundial() {
                 {loading ? (
                   <div className="loading"><div className="spinner" /></div>
                 ) : (
-                  matches.map(m => (
-                    <div key={m.id} className="ar">
-                      <div className="at" style={{ textAlign: "right" }}>{flag(m.home_team)} {m.home_team}</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <input className="si" type="number" min="0" max="99" disabled={m.home_score !== null}
-                          value={m.home_score !== null ? m.home_score : (adminR[m.id]?.home ?? "")}
-                          onChange={e => setAdminR(r => ({ ...r, [m.id]: { ...r[m.id], home: parseInt(e.target.value) || 0 } }))}
-                          placeholder="0" />
-                        <span className="ssep">–</span>
-                        <input className="si" type="number" min="0" max="99" disabled={m.away_score !== null}
-                          value={m.away_score !== null ? m.away_score : (adminR[m.id]?.away ?? "")}
-                          onChange={e => setAdminR(r => ({ ...r, [m.id]: { ...r[m.id], away: parseInt(e.target.value) || 0 } }))}
-                          placeholder="0" />
+                  matches.map(m => {
+                    const isDone = m.home_score !== null;
+                    const hasInput = adminR[m.id]?.home !== undefined && adminR[m.id]?.home !== "" &&
+                                    adminR[m.id]?.away !== undefined && adminR[m.id]?.away !== "";
+                    return (
+                      <div key={m.id} style={{
+                        padding: "12px 16px",
+                        borderBottom: "1px solid var(--border)",
+                        display: "flex", flexDirection: "column", gap: 10,
+                      }}>
+                        {/* Partido */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span className="gtag">Grupo {m.group_name}</span>
+                          <span style={{ fontSize: 11, color: "var(--dim)" }}>
+                            {new Date(m.match_date + "T12:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })}
+                          </span>
+                          {isDone && <span className="bgreen">✓ Registrado</span>}
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                          {/* Equipo local */}
+                          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>{m.home_team}</span>
+                            <span style={{ fontSize: 18 }}>{flag(m.home_team)}</span>
+                          </div>
+
+                          {/* Inputs de marcador */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                            <input className="si" type="number" min="0" max="99"
+                              disabled={isDone}
+                              value={isDone ? m.home_score : (adminR[m.id]?.home ?? "")}
+                              onChange={e => setAdminR(r => ({
+                                ...r, [m.id]: { ...r[m.id], home: e.target.value }
+                              }))}
+                              placeholder="0" />
+                            <span className="ssep">–</span>
+                            <input className="si" type="number" min="0" max="99"
+                              disabled={isDone}
+                              value={isDone ? m.away_score : (adminR[m.id]?.away ?? "")}
+                              onChange={e => setAdminR(r => ({
+                                ...r, [m.id]: { ...r[m.id], away: e.target.value }
+                              }))}
+                              placeholder="0" />
+                          </div>
+
+                          {/* Equipo visitante */}
+                          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 18 }}>{flag(m.away_team)}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>{m.away_team}</span>
+                          </div>
+
+                          {/* Botón guardar */}
+                          <div style={{ flexShrink: 0 }}>
+                            {isDone ? (
+                              <span className="bgreen" style={{ fontSize: 12 }}>✓</span>
+                            ) : (
+                              <button
+                                className="btn btn-green btn-sm"
+                                onClick={() => applyResult(m.id)}
+                                disabled={!hasInput}
+                                style={{ opacity: hasInput ? 1 : 0.4 }}
+                              >
+                                Guardar
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="at">{m.away_team} {flag(m.away_team)}</div>
-                      <div>
-                        {m.home_score !== null
-                          ? <span className="bgreen">✓</span>
-                          : <button className="btn btn-green btn-sm" onClick={() => applyResult(m.id)}>✓</button>
-                        }
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </>
