@@ -49,21 +49,23 @@ function calcPrizes(n) {
 function calcPrizesByRank(sortedParticipants, prizes) {
   if (!sortedParticipants || sortedParticipants.length === 0) return {};
 
-  const prizePool  = [prizes.first, prizes.second, prizes.third];
-  const result     = {};
-  const uniquePts  = [...new Set(sortedParticipants.map(p => p.total_points))];
-  let rankIndex    = 0;
+  const prizePool = [prizes.first, prizes.second, prizes.third];
+  const result    = {};
+  const uniquePts = [...new Set(sortedParticipants.map(p => p.total_points))];
 
-  for (const pts of uniquePts) {
-    if (rankIndex >= 3) break;
-    const group    = sortedParticipants.filter(p => p.total_points === pts);
-    const rankLabel= ["1°","2°","3°"][rankIndex];
-    const prize    = prizePool[rankIndex];
+  uniquePts.forEach((pts, rankIndex) => {
+    if (rankIndex >= 3) return;
+    const group     = sortedParticipants.filter(p => p.total_points === pts);
+    const rankLabel = ["1°", "2°", "3°"][rankIndex];
+    const prize     = prizePool[rankIndex];
     group.forEach(p => {
-      result[p.id] = { rank: rankLabel, prize: Math.floor(prize / group.length), tiedWith: group.length };
+      result[p.id] = {
+        rank:     rankLabel,
+        prize:    Math.floor(prize / group.length),
+        tiedWith: group.length,
+      };
     });
-    rankIndex += group.length;
-  }
+  });
 
   return result;
 }
