@@ -449,23 +449,26 @@ export default function QuinielaMundial() {
       const matchRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${matchId}`, {
         method: "PATCH",
         headers: {
-          apikey:         SUPABASE_ANON_KEY,
-          Authorization:  `Bearer ${SUPABASE_ANON_KEY}`,
-          "Content-Type": "application/json",
-          "Prefer":       "return=minimal",
+          apikey:           SUPABASE_ANON_KEY,
+          Authorization:    `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type":   "application/json; charset=utf-8",
+          "Prefer":         "return=representation",
+          "Accept":         "application/json",
         },
         body: JSON.stringify({
           home_score: Number(r.home),
           away_score: Number(r.away),
-          locked: true,
+          locked:     true,
         }),
       });
   
       console.log("STATUS PATCH matches:", matchRes.status);
       const matchResText = await matchRes.text();
       console.log("RESPUESTA PATCH matches:", matchResText);
-      console.log("URL llamada:", `${SUPABASE_URL}/rest/v1/matches?id=eq.${matchId}`);
-      console.log("Body enviado:", { home_score: Number(r.home), away_score: Number(r.away), locked: true });
+  
+      if (!matchRes.ok) {
+        throw new Error(`Error ${matchRes.status}: ${matchResText}`);
+      }
   
       if (!matchRes.ok) {
         throw new Error(`Error ${matchRes.status}: ${matchResText}`);
