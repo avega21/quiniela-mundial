@@ -462,10 +462,6 @@ export default function QuinielaMundial() {
         }),
       });
   
-      console.log("STATUS PATCH matches:", matchRes.status);
-      const matchResText = await matchRes.text();
-      console.log("RESPUESTA PATCH matches:", matchResText);
-  
       if (!matchRes.ok) {
         throw new Error(`Error ${matchRes.status}: ${matchResText}`);
       }
