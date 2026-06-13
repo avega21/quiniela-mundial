@@ -268,7 +268,7 @@ export default function QuinielaMundial() {
     try {
       const [ps, ms, cfg] = await Promise.all([
         db("participants?select=*&order=total_points.desc"),
-        db("matches?select=*&order=id.asc"),
+        db("matches?select=id,group_name,home_team,away_team,match_date,home_score,away_score,locked&order=id.asc"),
         db("config?key=eq.predictions_locked&select=value"),
       ]);
       setParticipants(ps || []);
@@ -502,6 +502,12 @@ export default function QuinielaMundial() {
         x.id === matchId ? { ...x, home_score: Number(r.home), away_score: Number(r.away) } : x
       ));
       await loadData();
+      // Limpiar el input local de este partido
+      setAdminR(r => {
+        const copy = { ...r };
+        delete copy[matchId];
+        return copy;
+      });
       toast_("Resultado guardado y puntos actualizados", "⚽");
     } catch (e) {
       toast_("Error: " + e.message, "❌");
@@ -555,7 +561,7 @@ export default function QuinielaMundial() {
   const sorted     = [...participants].sort((a, b) => b.total_points - a.total_points);
   const allGroups  = [...new Set(matches.map(m => m.group_name))].sort();
   const shown      = filter === "ALL" ? matches : matches.filter(m => m.group_name === filter);
-  const played     = matches.filter(m => m.home_score !== null).length;
+  const played     = matches.filter(m => m.home_score !== null && m.home_score !== undefined).length;
   const predCount  = Object.values(preds).filter(p => p.home !== "" && p.home !== undefined).length;
 
   const prizeFor = i => {
@@ -648,6 +654,13 @@ export default function QuinielaMundial() {
                     <div style={{ fontFamily: "'Bebas Neue'", fontSize: 28, lineHeight: 1 }}>
                       {played}<span style={{ fontSize: 15, color: "var(--dim)" }}>/{matches.length}</span>
                     </div>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={loadData}
+                      style={{ marginTop: 6, fontSize: 11, padding: "4px 10px" }}
+                    >
+                      🔄 Actualizar
+                    </button>
                   </div>
                 </div>
                 <div className="pgrid">
