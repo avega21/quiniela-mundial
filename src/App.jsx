@@ -45,6 +45,51 @@ function calcPrizes(n) {
   };
 }
 
+// AGREGAR esta función nueva justo debajo de calcPrizes
+function calcPrizesByRank(sortedParticipants, prizes) {
+  if (sortedParticipants.length === 0) return {};
+
+  // Agrupar participantes por puntos
+  const groups = [];
+  let i = 0;
+  while (i < sortedParticipants.length) {
+    const pts = sortedParticipants[i].total_points;
+    const group = sortedParticipants.filter(p => p.total_points === pts);
+    groups.push({ pts, members: group });
+    i += group.length;
+  }
+
+  // Asignar premios por grupo ocupando posiciones
+  const result = {}; // { participantId: { rank, prize, tiedWith } }
+  let positionIndex = 0; // 0=1°, 1=2°, 2=3°
+
+  for (const group of groups) {
+    if (positionIndex >= 3) break; // Solo premiamos top 3
+
+    // Sumar todos los premios que abarca este grupo
+    // Ej: 2 jugadores empatados en 1° → suman premio de 1° + 2° y dividen
+    const prizesToShare = [];
+    for (let j = 0; j < group.members.length && positionIndex + j < 3; j++) {
+      prizesToShare.push([prizes.first, prizes.second, prizes.third][positionIndex + j]);
+    }
+    const totalPrize     = prizesToShare.reduce((a, b) => a + b, 0);
+    const prizePerPerson = Math.floor(totalPrize / group.members.length);
+    const rankLabel      = ["1°", "2°", "3°"][positionIndex];
+
+    group.members.forEach(p => {
+      result[p.id] = {
+        rank:      rankLabel,
+        prize:     prizePerPerson,
+        tiedWith:  group.members.length,
+      };
+    });
+
+    positionIndex += group.members.length;
+  }
+
+  return result;
+}
+
 // ─── Points logic ─────────────────────────────────────────────────────────────
 function calcPoints(predHome, predAway, realHome, realAway) {
   if (realHome === null || realHome === undefined) return null;
@@ -573,11 +618,15 @@ export default function QuinielaMundial() {
   const played     = matches.filter(m => m.home_score !== null && m.home_score !== undefined).length;
   const predCount  = Object.values(preds).filter(p => p.home !== "" && p.home !== undefined).length;
 
-  const prizeFor = i => {
-    if (i === 0) return `$${prizes.first.toLocaleString()} MXN`;
-    if (i === 1) return `$${prizes.second.toLocaleString()} MXN`;
-    if (i === 2) return `$${prizes.third.toLocaleString()} MXN`;
-    return null;
+  const prizeMap = calcPrizesByRank(sorted, prizes);
+
+  const prizeFor = (p) => {
+    const info = prizeMap[p.id];
+    if (!info) return null;
+    const label = info.tiedWith > 1
+      ? `💰 $${info.prize.toLocaleString()} MXN (${info.rank} · entre ${info.tiedWith})`
+      : `💰 $${info.prize.toLocaleString()} MXN`;
+    return label;
   };
 
   // ── Login screen ─────────────────────────────────────────────────────────────
@@ -673,9 +722,34 @@ export default function QuinielaMundial() {
                   </div>
                 </div>
                 <div className="pgrid">
-                  <div className="pc g"><div className="pc-label">🥇 1° LUGAR</div><div className="pc-amt amt-gold">${prizes.first.toLocaleString()}</div><div className="pc-pct">50% del pozo</div></div>
-                  <div className="pc">  <div className="pc-label">🥈 2° LUGAR</div><div className="pc-amt amt-silver">${prizes.second.toLocaleString()}</div><div className="pc-pct">30% del pozo</div></div>
-                  <div className="pc">  <div className="pc-label">🥉 3° LUGAR</div><div className="pc-amt amt-bronze">${prizes.third.toLocaleString()}</div><div className="pc-pct">20% del pozo</div></div>
+                  {(() => {
+                    // Calcular cuántos hay en cada posición
+                    const g1 = sorted.filter(p => prizeMap[p.id]?.rank === "1°");
+                    const g2 = sorted.filter(p => prizeMap[p.id]?.rank === "2°");
+                    const g3 = sorted.filter(p => prizeMap[p.id]?.rank === "3°");
+                    const amt1 = g1.length > 0 ? prizeMap[g1[0].id]?.prize : prizes.first;
+                    const amt2 = g2.length > 0 ? prizeMap[g2[0].id]?.prize : prizes.second;
+                    const amt3 = g3.length > 0 ? prizeMap[g3[0].id]?.prize : prizes.third;
+                    return (
+                      <>
+                        <div className="pc g">
+                          <div className="pc-label">🥇 1° LUGAR{g1.length > 1 ? ` (×${g1.length})` : ""}</div>
+                          <div className="pc-amt amt-gold">${amt1.toLocaleString()}</div>
+                          <div className="pc-pct">{g1.length > 1 ? `$${prizes.first.toLocaleString()} ÷ ${g1.length}` : "50% del pozo"}</div>
+                        </div>
+                        <div className="pc">
+                          <div className="pc-label">🥈 2° LUGAR{g2.length > 1 ? ` (×${g2.length})` : ""}</div>
+                          <div className="pc-amt amt-silver">${amt2.toLocaleString()}</div>
+                          <div className="pc-pct">{g2.length > 1 ? `$${prizes.second.toLocaleString()} ÷ ${g2.length}` : "30% del pozo"}</div>
+                        </div>
+                        <div className="pc">
+                          <div className="pc-label">🥉 3° LUGAR{g3.length > 1 ? ` (×${g3.length})` : ""}</div>
+                          <div className="pc-amt amt-bronze">${amt3.toLocaleString()}</div>
+                          <div className="pc-pct">{g3.length > 1 ? `$${prizes.third.toLocaleString()} ÷ ${g3.length}` : "20% del pozo"}</div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -697,7 +771,7 @@ export default function QuinielaMundial() {
                           {p.id === participant.id && <span className="mec">YO</span>}
                         </div>
                         {/* <div className="lbc">{p.code}</div> */}
-                        {prizeFor(i) && <div className="lbprize">💰 {prizeFor(i)}</div>}
+                        {prizeFor(p) && <div className="lbprize">{prizeFor(p)}</div>}
                       </div>
                       <div>
                         <div className="lbpts">{p.total_points}</div>
