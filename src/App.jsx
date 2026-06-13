@@ -49,42 +49,33 @@ function calcPrizes(n) {
 function calcPrizesByRank(sortedParticipants, prizes) {
   if (sortedParticipants.length === 0) return {};
 
-  // Agrupar participantes por puntos
-  const groups = [];
-  let i = 0;
-  while (i < sortedParticipants.length) {
-    const pts = sortedParticipants[i].total_points;
+  const prizePool = [prizes.first, prizes.second, prizes.third];
+  const result = {};
+
+  // Agrupar por puntos en orden descendente (sin duplicar grupos)
+  const uniquePoints = [...new Set(sortedParticipants.map(p => p.total_points))];
+  let rankIndex = 0; // qué posición de premio vamos a asignar (0=1°, 1=2°, 2=3°)
+
+  for (const pts of uniquePoints) {
+    if (rankIndex >= 3) break;
+
     const group = sortedParticipants.filter(p => p.total_points === pts);
-    groups.push({ pts, members: group });
-    i += group.length;
-  }
+    const rankLabel = ["1°", "2°", "3°"][rankIndex];
 
-  // Asignar premios por grupo ocupando posiciones
-  const result = {}; // { participantId: { rank, prize, tiedWith } }
-  let positionIndex = 0; // 0=1°, 1=2°, 2=3°
+    // Solo dividir el premio de ESA posición, sin acumular posiciones siguientes
+    const prizeForThisRank = prizePool[rankIndex];
+    const prizePerPerson   = Math.floor(prizeForThisRank / group.members.length);
 
-  for (const group of groups) {
-    if (positionIndex >= 3) break; // Solo premiamos top 3
-
-    // Sumar todos los premios que abarca este grupo
-    // Ej: 2 jugadores empatados en 1° → suman premio de 1° + 2° y dividen
-    const prizesToShare = [];
-    for (let j = 0; j < group.members.length && positionIndex + j < 3; j++) {
-      prizesToShare.push([prizes.first, prizes.second, prizes.third][positionIndex + j]);
-    }
-    const totalPrize     = prizesToShare.reduce((a, b) => a + b, 0);
-    const prizePerPerson = Math.floor(totalPrize / group.members.length);
-    const rankLabel      = ["1°", "2°", "3°"][positionIndex];
-
-    group.members.forEach(p => {
+    group.forEach(p => {
       result[p.id] = {
-        rank:      rankLabel,
-        prize:     prizePerPerson,
-        tiedWith:  group.members.length,
+        rank:     rankLabel,
+        prize:    Math.floor(prizeForThisRank / group.length),
+        tiedWith: group.length,
       };
     });
 
-    positionIndex += group.members.length;
+    // Avanzar tantas posiciones como miembros tenga el grupo
+    rankIndex += group.length;
   }
 
   return result;
@@ -762,8 +753,15 @@ export default function QuinielaMundial() {
                   )}
                   {sorted.map((p, i) => (
                     <div key={p.id} className={`lbr ${p.id === participant.id ? "me" : ""}`}>
-                      <div className={`rnk ${i === 0 ? "g" : i === 1 ? "s" : i === 2 ? "b" : ""}`}>
-                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                      <div className={`rnk ${
+                        prizeMap[p.id]?.rank === "1°" ? "g" :
+                        prizeMap[p.id]?.rank === "2°" ? "s" :
+                        prizeMap[p.id]?.rank === "3°" ? "b" : ""
+                      }`}>
+                        {prizeMap[p.id]?.rank === "1°" ? "🥇" :
+                        prizeMap[p.id]?.rank === "2°" ? "🥈" :
+                        prizeMap[p.id]?.rank === "3°" ? "🥉" :
+                        `#${i + 1}`}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
