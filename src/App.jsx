@@ -47,34 +47,21 @@ function calcPrizes(n) {
 
 // AGREGAR esta función nueva justo debajo de calcPrizes
 function calcPrizesByRank(sortedParticipants, prizes) {
-  if (sortedParticipants.length === 0) return {};
+  if (!sortedParticipants || sortedParticipants.length === 0) return {};
 
-  const prizePool = [prizes.first, prizes.second, prizes.third];
-  const result = {};
+  const prizePool  = [prizes.first, prizes.second, prizes.third];
+  const result     = {};
+  const uniquePts  = [...new Set(sortedParticipants.map(p => p.total_points))];
+  let rankIndex    = 0;
 
-  // Agrupar por puntos en orden descendente (sin duplicar grupos)
-  const uniquePoints = [...new Set(sortedParticipants.map(p => p.total_points))];
-  let rankIndex = 0; // qué posición de premio vamos a asignar (0=1°, 1=2°, 2=3°)
-
-  for (const pts of uniquePoints) {
+  for (const pts of uniquePts) {
     if (rankIndex >= 3) break;
-
-    const group = sortedParticipants.filter(p => p.total_points === pts);
-    const rankLabel = ["1°", "2°", "3°"][rankIndex];
-
-    // Solo dividir el premio de ESA posición, sin acumular posiciones siguientes
-    const prizeForThisRank = prizePool[rankIndex];
-    const prizePerPerson   = Math.floor(prizeForThisRank / group.members.length);
-
+    const group    = sortedParticipants.filter(p => p.total_points === pts);
+    const rankLabel= ["1°","2°","3°"][rankIndex];
+    const prize    = prizePool[rankIndex];
     group.forEach(p => {
-      result[p.id] = {
-        rank:     rankLabel,
-        prize:    Math.floor(prizeForThisRank / group.length),
-        tiedWith: group.length,
-      };
+      result[p.id] = { rank: rankLabel, prize: Math.floor(prize / group.length), tiedWith: group.length };
     });
-
-    // Avanzar tantas posiciones como miembros tenga el grupo
     rankIndex += group.length;
   }
 
@@ -713,34 +700,24 @@ export default function QuinielaMundial() {
                   </div>
                 </div>
                 <div className="pgrid">
-                  {(() => {
-                    // Calcular cuántos hay en cada posición
-                    const g1 = sorted.filter(p => prizeMap[p.id]?.rank === "1°");
-                    const g2 = sorted.filter(p => prizeMap[p.id]?.rank === "2°");
-                    const g3 = sorted.filter(p => prizeMap[p.id]?.rank === "3°");
-                    const amt1 = g1.length > 0 ? prizeMap[g1[0].id]?.prize : prizes.first;
-                    const amt2 = g2.length > 0 ? prizeMap[g2[0].id]?.prize : prizes.second;
-                    const amt3 = g3.length > 0 ? prizeMap[g3[0].id]?.prize : prizes.third;
+                  {(["1°","2°","3°"]).map((rankLabel, idx) => {
+                    const poolAmt   = [prizes.first, prizes.second, prizes.third][idx];
+                    const emoji     = ["🥇","🥈","🥉"][idx];
+                    const cls       = ["amt-gold","amt-silver","amt-bronze"][idx];
+                    const label     = ["1° LUGAR","2° LUGAR","3° LUGAR"][idx];
+                    const inRank    = sorted.filter(p => prizeMap[p.id]?.rank === rankLabel);
+                    const count     = inRank.length;
+                    const shownAmt  = count > 0 ? Math.floor(poolAmt / count) : poolAmt;
                     return (
-                      <>
-                        <div className="pc g">
-                          <div className="pc-label">🥇 1° LUGAR{g1.length > 1 ? ` (×${g1.length})` : ""}</div>
-                          <div className="pc-amt amt-gold">${amt1.toLocaleString()}</div>
-                          <div className="pc-pct">{g1.length > 1 ? `$${prizes.first.toLocaleString()} ÷ ${g1.length}` : "50% del pozo"}</div>
+                      <div key={rankLabel} className={`pc ${idx === 0 ? "g" : ""}`}>
+                        <div className="pc-label">{emoji} {label}{count > 1 ? ` (×${count})` : ""}</div>
+                        <div className={`pc-amt ${cls}`}>${shownAmt.toLocaleString()}</div>
+                        <div className="pc-pct">
+                          {count > 1 ? `$${poolAmt.toLocaleString()} ÷ ${count}` : ["50%","30%","20%"][idx] + " del pozo"}
                         </div>
-                        <div className="pc">
-                          <div className="pc-label">🥈 2° LUGAR{g2.length > 1 ? ` (×${g2.length})` : ""}</div>
-                          <div className="pc-amt amt-silver">${amt2.toLocaleString()}</div>
-                          <div className="pc-pct">{g2.length > 1 ? `$${prizes.second.toLocaleString()} ÷ ${g2.length}` : "30% del pozo"}</div>
-                        </div>
-                        <div className="pc">
-                          <div className="pc-label">🥉 3° LUGAR{g3.length > 1 ? ` (×${g3.length})` : ""}</div>
-                          <div className="pc-amt amt-bronze">${amt3.toLocaleString()}</div>
-                          <div className="pc-pct">{g3.length > 1 ? `$${prizes.third.toLocaleString()} ÷ ${g3.length}` : "20% del pozo"}</div>
-                        </div>
-                      </>
+                      </div>
                     );
-                  })()}
+                  })}
                 </div>
               </div>
 
