@@ -446,7 +446,7 @@ export default function QuinielaMundial() {
       return;
     }
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${matchId}`, {
+      const matchRes = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${matchId}`, {
         method: "PATCH",
         headers: {
           apikey:         SUPABASE_ANON_KEY,
@@ -460,6 +460,16 @@ export default function QuinielaMundial() {
           locked: true,
         }),
       });
+  
+      console.log("STATUS PATCH matches:", matchRes.status);
+      const matchResText = await matchRes.text();
+      console.log("RESPUESTA PATCH matches:", matchResText);
+      console.log("URL llamada:", `${SUPABASE_URL}/rest/v1/matches?id=eq.${matchId}`);
+      console.log("Body enviado:", { home_score: Number(r.home), away_score: Number(r.away), locked: true });
+  
+      if (!matchRes.ok) {
+        throw new Error(`Error ${matchRes.status}: ${matchResText}`);
+      }
   
       // Actualizar puntos de todos los participantes para este partido
       const allPredRows = await db(
