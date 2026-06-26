@@ -312,7 +312,7 @@ export default function QuinielaMundial() {
     try {
       const [ps, ms, cfg] = await Promise.all([
         db("participants?select=*&order=total_points.desc"),
-        db("matches?select=id,group_name,home_team,away_team,match_date,home_score,away_score,locked,teams_confirmed,phase&order=id.asc"),
+        db("matches?select=id,group_name,home_team,away_team,match_date,home_score,away_score,locked,teams_confirmed,phase&order=match_date.asc,id.asc"),
         db("config?key=eq.predictions_locked&select=value"),
       ]);
       setParticipants(ps || []);
@@ -855,7 +855,7 @@ export default function QuinielaMundial() {
                           <span className="gtag">Grupo {match.group_name}</span>
                         ) : (
                           <span className="gtag" style={{ background: "rgba(245,158,11,0.2)", color: "var(--gold)" }}>
-                            {{ r16:"16avos", qf:"Cuartos", sf:"Semis", "3rd":"3er Lugar", final:"FINAL" }[match.phase] || match.phase}
+                            {{ r16:"16avos", r8:"Octavos", qf:"Cuartos", sf:"Semis", "3rd":"3er Lugar", final:"FINAL" }[match.phase] || match.phase}
                           </span>
                         )}
                         <span>{new Date(match.match_date + "T12:00:00").toLocaleDateString("es-MX", {
@@ -1013,7 +1013,7 @@ export default function QuinielaMundial() {
                           background: "rgba(245,158,11,0.2)",
                           color: "var(--gold)",
                         }}>
-                          {{r16:"Octavos", qf:"Cuartos", sf:"Semis", "3rd":"3er lugar", final:"Final"}[m.phase] || m.phase}
+                          {{r16:"16avos", r8:"Octavos", qf:"Cuartos", sf:"Semis", "3rd":"3er lugar", final:"Final"}[m.phase] || m.phase}
                         </span>
                         <span>{new Date(m.match_date + "T12:00:00").toLocaleDateString("es-MX", {
                           weekday: "short", day: "numeric", month: "short"
@@ -1091,7 +1091,7 @@ export default function QuinielaMundial() {
                           <span className="gtag">Grupo {m.group_name}</span>
                         ) : (
                           <span className="gtag" style={{ background: "rgba(245,158,11,0.2)", color: "var(--gold)" }}>
-                            {{ r16:"16avos", qf:"Cuartos", sf:"Semis", "3rd":"3er Lugar", final:"FINAL" }[m.phase] || m.phase}
+                            {{ r16:"16avos", r8:"Octavos", qf:"Cuartos", sf:"Semis", "3rd":"3er Lugar", final:"FINAL" }[m.phase] || m.phase}
                           </span>
                         )}
                           <span style={{ fontSize: 11, color: "var(--dim)" }}>
