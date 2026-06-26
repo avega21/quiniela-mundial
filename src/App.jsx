@@ -298,6 +298,8 @@ export default function QuinielaMundial() {
   const [overviewPlayer, setOverviewPlayer] = useState(null);
   const [loadingPreds, setLoadingPreds]   = useState(false);
 
+  const [editTeams, setEditTeams] = useState({});
+
   // ── Toast helper ────────────────────────────────────────────────────────────
   const toast_ = (msg, emoji = "✅") => {
     setToast({ msg, emoji });
@@ -979,6 +981,79 @@ export default function QuinielaMundial() {
                   ))
                 )}
               </div>
+
+              {/* Equipos fases eliminatorias */}
+              {matches.some(m => !m.teams_confirmed) && (
+                <div className="card" style={{ marginBottom: 18 }}>
+                  <div className="card-hdr">
+                    <strong>🏆 Equipos por confirmar</strong>
+                    <span className="byellow">
+                      {matches.filter(m => !m.teams_confirmed).length} pendientes
+                    </span>
+                  </div>
+                  {matches.filter(m => !m.teams_confirmed).map(m => (
+                    <div key={m.id} style={{
+                      padding: "14px 18px",
+                      borderBottom: "1px solid var(--border)",
+                    }}>
+                      {/* Fase y fecha */}
+                      <div className="mmeta" style={{ marginBottom: 10 }}>
+                        <span className="gtag" style={{
+                          background: "rgba(245,158,11,0.2)",
+                          color: "var(--gold)",
+                        }}>
+                          {{r16:"Octavos", qf:"Cuartos", sf:"Semis", "3rd":"3er lugar", final:"Final"}[m.phase] || m.phase}
+                        </span>
+                        <span>{new Date(m.match_date + "T12:00:00").toLocaleDateString("es-MX", {
+                          weekday: "short", day: "numeric", month: "short"
+                        })}</span>
+                      </div>
+
+                      {/* Nombres temporales actuales */}
+                      <div style={{
+                        fontSize: 12, color: "var(--dim)",
+                        marginBottom: 10, fontStyle: "italic",
+                      }}>
+                        Actual: {m.home_team} vs {m.away_team}
+                      </div>
+
+                      {/* Inputs para actualizar */}
+                      <div className="agrid" style={{ marginBottom: 10 }}>
+                        <div>
+                          <span className="flabel">Equipo local</span>
+                          <input
+                            className="inp inp-plain"
+                            placeholder={m.home_team}
+                            value={editTeams[m.id]?.home ?? ""}
+                            onChange={e => setEditTeams(t => ({
+                              ...t, [m.id]: { ...t[m.id], home: e.target.value }
+                            }))}
+                          />
+                        </div>
+                        <div>
+                          <span className="flabel">Equipo visitante</span>
+                          <input
+                            className="inp inp-plain"
+                            placeholder={m.away_team}
+                            value={editTeams[m.id]?.away ?? ""}
+                            onChange={e => setEditTeams(t => ({
+                              ...t, [m.id]: { ...t[m.id], away: e.target.value }
+                            }))}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-green btn-sm"
+                        disabled={!editTeams[m.id]?.home || !editTeams[m.id]?.away}
+                        style={{ opacity: (!editTeams[m.id]?.home || !editTeams[m.id]?.away) ? 0.4 : 1 }}
+                        onClick={() => updateMatchTeams(m.id, editTeams[m.id].home, editTeams[m.id].away)}
+                      >
+                        ✓ Confirmar equipos
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Match results */}
               <div className="card">
