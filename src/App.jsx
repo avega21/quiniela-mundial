@@ -846,8 +846,16 @@ export default function QuinielaMundial() {
                   return (
                     <div key={match.id} className={`mc ${lk ? "lk" : ""}`}>
                       <div className="mmeta">
-                        <span className="gtag">Grupo {match.group_name}</span>
-                        <span>{new Date(match.match_date + "T12:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })}</span>
+                        {match.phase === 'group' ? (
+                          <span className="gtag">Grupo {match.group_name}</span>
+                        ) : (
+                          <span className="gtag" style={{ background: "rgba(245,158,11,0.2)", color: "var(--gold)" }}>
+                            {{ r16:"16avos", qf:"Cuartos", sf:"Semis", "3rd":"3er Lugar", final:"FINAL" }[match.phase] || match.phase}
+                          </span>
+                        )}
+                        <span>{new Date(match.match_date + "T12:00:00").toLocaleDateString("es-MX", {
+                          weekday: "short", day: "numeric", month: "short"
+                        })}</span>
                         {lk && <span className="bgreen">✓ Finalizado</span>}
                         {!match.teams_confirmed && (
                           <span style={{
@@ -855,9 +863,7 @@ export default function QuinielaMundial() {
                             background: "rgba(245,158,11,0.1)",
                             border: "1px solid rgba(245,158,11,0.2)",
                             borderRadius: 4, padding: "2px 7px", fontWeight: 600,
-                          }}>
-                            ⏳ Equipos por confirmar
-                          </span>
+                          }}>⏳ Equipos por confirmar</span>
                         )}
                       </div>
                       <div className="mteams">
@@ -983,7 +989,7 @@ export default function QuinielaMundial() {
               </div>
 
               {/* Equipos fases eliminatorias */}
-              {matches.some(m => !m.teams_confirmed) && (
+              {matches.some(m => !m.teams_confirmed && m.phase !== 'group') && (
                 <div className="card" style={{ marginBottom: 18 }}>
                   <div className="card-hdr">
                     <strong>🏆 Equipos por confirmar</strong>
@@ -991,7 +997,7 @@ export default function QuinielaMundial() {
                       {matches.filter(m => !m.teams_confirmed).length} pendientes
                     </span>
                   </div>
-                  {matches.filter(m => !m.teams_confirmed).map(m => (
+                  {matches.filter(m => !m.teams_confirmed && m.phase !== 'group').map(m => (
                     <div key={m.id} style={{
                       padding: "14px 18px",
                       borderBottom: "1px solid var(--border)",
@@ -1076,7 +1082,13 @@ export default function QuinielaMundial() {
                       }}>
                         {/* Partido */}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        {m.phase === 'group' ? (
                           <span className="gtag">Grupo {m.group_name}</span>
+                        ) : (
+                          <span className="gtag" style={{ background: "rgba(245,158,11,0.2)", color: "var(--gold)" }}>
+                            {{ r16:"16avos", qf:"Cuartos", sf:"Semis", "3rd":"3er Lugar", final:"FINAL" }[m.phase] || m.phase}
+                          </span>
+                        )}
                           <span style={{ fontSize: 11, color: "var(--dim)" }}>
                             {new Date(m.match_date + "T12:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })}
                           </span>
