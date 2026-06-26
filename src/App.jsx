@@ -79,6 +79,23 @@ function calcPoints(predHome, predAway, realHome, realAway) {
   return rW === pW ? 2 : 0;
 }
 
+async function updateMatchTeamsRequest(matchId, homeTeam, awayTeam, supabaseUrl, anonKey) {
+  return fetch(`${supabaseUrl}/rest/v1/matches?id=eq.${matchId}`, {
+    method: "PATCH",
+    headers: {
+      apikey:         anonKey,
+      Authorization:  `Bearer ${anonKey}`,
+      "Content-Type": "application/json",
+      "Prefer":       "return=minimal",
+    },
+    body: JSON.stringify({
+      home_team:       homeTeam.trim(),
+      away_team:       awayTeam.trim(),
+      teams_confirmed: true,
+    }),
+  });
+}
+
 // ─── Flags ────────────────────────────────────────────────────────────────────
 const FLAGS = {
   "México":"🇲🇽","Sudáfrica":"🇿🇦","Corea del Sur":"🇰🇷","Chequia":"🇨🇿",
@@ -590,6 +607,30 @@ export default function QuinielaMundial() {
     }
   };
 
+  const updateMatchTeams = async (matchId, homeTeam, awayTeam) => {
+    if (!homeTeam.trim() || !awayTeam.trim()) return;
+    try {
+      const res = await updateMatchTeamsRequest(matchId, homeTeam, awayTeam, SUPABASE_URL, SUPABASE_ANON_KEY);
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg);
+      }
+      setMatches(ms => ms.map(m =>
+        m.id === matchId
+          ? { ...m, home_team: homeTeam.trim(), away_team: awayTeam.trim(), teams_confirmed: true }
+          : m
+      ));
+      setEditTeams(t => {
+        const copy = { ...t };
+        delete copy[matchId];
+        return copy;
+      });
+      toast_("Equipos actualizados", "✅");
+    } catch (e) {
+      toast_("Error: " + e.message, "❌");
+    }
+  };
+
   // ── Derived ──────────────────────────────────────────────────────────────────
   const prizes     = calcPrizes(participants.length);
   const sorted     = [...participants].sort((a, b) => b.total_points - a.total_points);
@@ -806,15 +847,25 @@ export default function QuinielaMundial() {
                         <span className="gtag">Grupo {match.group_name}</span>
                         <span>{new Date(match.match_date + "T12:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" })}</span>
                         {lk && <span className="bgreen">✓ Finalizado</span>}
+                        {!match.teams_confirmed && (
+                          <span style={{
+                            fontSize: 11, color: "var(--gold)",
+                            background: "rgba(245,158,11,0.1)",
+                            border: "1px solid rgba(245,158,11,0.2)",
+                            borderRadius: 4, padding: "2px 7px", fontWeight: 600,
+                          }}>
+                            ⏳ Equipos por confirmar
+                          </span>
+                        )}
                       </div>
                       <div className="mteams">
                         <div className="tm"><span className="tflag">{flag(match.home_team)}</span><span className="tname">{match.home_team}</span></div>
                         <div className="sinputs">
-                          <input className="si" type="number" min="0" max="99" disabled={lk || predsLocked}
+                          <input className="si" type="number" min="0" max="99" disabled={lk || predsLocked || !match.teams_confirmed}
                             value={p.home ?? ""} placeholder="–"
                             onChange={e => setPred(match.id, "home", e.target.value)} />
                           <span className="ssep">–</span>
-                          <input className="si" type="number" min="0" max="99" disabled={lk || predsLocked}
+                          <input className="si" type="number" min="0" max="99" disabled={lk || predsLocked || !match.teams_confirmed}
                             value={p.away ?? ""} placeholder="–"
                             onChange={e => setPred(match.id, "away", e.target.value)} />
                         </div>
