@@ -312,7 +312,7 @@ export default function QuinielaMundial() {
     try {
       const [ps, ms, cfg] = await Promise.all([
         db("participants?select=*&order=total_points.desc"),
-        db("matches?select=id,group_name,home_team,away_team,match_date,home_score,away_score,locked&order=id.asc"),
+        db("matches?select=id,group_name,home_team,away_team,match_date,home_score,away_score,locked,teams_confirmed,phase&order=id.asc"),
         db("config?key=eq.predictions_locked&select=value"),
       ]);
       setParticipants(ps || []);
@@ -613,6 +613,11 @@ export default function QuinielaMundial() {
     if (!homeTeam.trim() || !awayTeam.trim()) return;
     try {
       const res = await updateMatchTeamsRequest(matchId, homeTeam, awayTeam, SUPABASE_URL, SUPABASE_ANON_KEY);
+      const resText = await res.text();
+
+      if (!res.ok) {
+        throw new Error(`Error ${res.status}: ${resText}`);
+      }
       if (!res.ok) {
         const msg = await res.text();
         throw new Error(msg);
